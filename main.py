@@ -5,12 +5,48 @@ import threading
 import argparse
 import os
 import json
-from restaurant_grid import RestaurantEnvironment
-from restaurant_layout import create_restaurant_layout, print_restaurant_info, display_full_restaurant
-from baseline.robot_baseline import BaselineRobot
-from rag_robot.robot_rag import RagRobot
-from visualization import animate_robot_path
-from order import OrderManager, Order
+import sys
+import warnings
+import dotenv
+import matplotlib.pyplot as plt
+import pandas as pd
+from matplotlib.font_manager import FontProperties
+
+from colorama import Fore, Style, init
+
+# 配置matplotlib中文字体支持
+try:
+    # 检查是否存在特定的字体配置环境变量
+    font_path = os.environ.get('MATPLOTLIB_FONT', None)
+    if font_path and os.path.exists(font_path):
+        # 使用指定的字体文件
+        font_prop = FontProperties(fname=font_path)
+        plt.rcParams['font.family'] = font_prop.get_name()
+    else:
+        # 尝试使用系统中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS']
+        plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+except Exception as e:
+    print(f"配置中文字体时出错: {e}")
+    print("将使用默认字体")
+
+# 过滤matplotlib中文字体警告
+warnings.filterwarnings("ignore", category=UserWarning, module="tkinter")
+
+# 检查是否需要使用英文标题（ASCII模式）
+ASCII_MODE = False
+if "--ascii" in sys.argv:
+    ASCII_MODE = True
+    sys.argv.remove("--ascii")
+    print("使用ASCII模式（英文标题）运行")
+
+from modules.environment import RestaurantEnvironment, create_restaurant_layout, print_restaurant_info, display_full_restaurant
+from modules.robot import Robot
+from modules.utils import animate_robot_path, OrderManager, Order
+
+def get_title(zh_title, en_title):
+    """根据ASCII模式返回适当的标题"""
+    return en_title if ASCII_MODE else zh_title
 
 def process_kitchen(order_manager, stop_event):
     """
@@ -29,7 +65,7 @@ def run_baseline_simulation(restaurant, order_manager, robot_count=1):
     # 创建机器人
     robots = []
     for i in range(robot_count):
-        robot = BaselineRobot(restaurant, robot_id=i+1)
+        robot = Robot(restaurant, robot_id=i+1, enable_rag=False)
         robots.append(robot)
     
     # 启动厨房处理线程
@@ -111,7 +147,8 @@ def run_baseline_simulation(restaurant, order_manager, robot_count=1):
     for i, robot in enumerate(robots):
         print(f"\n机器人 #{i+1} 路径:")
         if robot.path_history:
-            animate_robot_path(robot.path_history, title=f"基线机器人 #{i+1} 路径")
+            title = get_title(f"基线机器人 #{i+1} 路径", f"Baseline Robot #{i+1} Path")
+            animate_robot_path(robot.path_history, title=title)
         else:
             print("  无路径记录")
     
@@ -135,13 +172,14 @@ def run_rag_simulation(restaurant, order_manager, robot_count=1, api_key=None, c
     robots = []
     for i in range(robot_count):
         try:
-            robot = RagRobot(restaurant, robot_id=i+1, api_key=api_key, 
-                             config_file=config_file, knowledge_file=knowledge_file)
+            robot = Robot(restaurant, robot_id=i+1, enable_rag=True, 
+                          api_key=api_key, config_file=config_file, 
+                          knowledge_file=knowledge_file)
             robots.append(robot)
         except Exception as e:
             print(f"创建RAG机器人失败: {e}")
             print("使用基线机器人替代")
-            robot = BaselineRobot(restaurant, robot_id=i+1)
+            robot = Robot(restaurant, robot_id=i+1, enable_rag=False)
             robots.append(robot)
     
     # 启动厨房处理线程
@@ -169,8 +207,8 @@ def run_rag_simulation(restaurant, order_manager, robot_count=1, api_key=None, c
                         order_manager.assign_order_to_robot(next_order.order_id, robot.robot_id)
                         path_success = robot.assign_order(next_order)
                         
-                        # 如果路径规划成功且是RAG机器人，进行障碍物处理测试
-                        if path_success and isinstance(robot, RagRobot) and simulation_time > 3:
+                        # 如果路径规划成功且是启用了RAG，进行障碍物处理测试
+                        if path_success and robot.enable_rag and simulation_time > 3:
                             print("\n执行RAG障碍物处理综合测试...")
                             robot.comprehensive_test()
             
@@ -228,7 +266,8 @@ def run_rag_simulation(restaurant, order_manager, robot_count=1, api_key=None, c
     for i, robot in enumerate(robots):
         print(f"\n机器人 #{i+1} 路径:")
         if robot.path_history:
-            animate_robot_path(robot.path_history, title=f"RAG机器人 #{i+1} 路径")
+            title = get_title(f"RAG机器人 #{i+1} 路径", f"RAG Robot #{i+1} Path")
+            animate_robot_path(robot.path_history, title=title)
         else:
             print("  无路径记录")
     
@@ -299,7 +338,7 @@ def ask_for_openai_key():
         # 询问是否保存到配置文件
         save_to_file = input("是否保存此密钥到配置文件? (y/n): ").lower() == 'y'
         if save_to_file:
-            config_dir = "rag_robot"
+            config_dir = "./"
             os.makedirs(config_dir, exist_ok=True)
             config_path = os.path.join(config_dir, "config.json")
             
@@ -325,19 +364,33 @@ def ask_for_openai_key():
     
     return api_key
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="餐厅配送机器人模拟")
+    parser.add_argument('--api_key', type=str, help='OpenAI API 密钥')
+    parser.add_argument('--config', type=str, default='config.json', help='配置文件路径')
+    parser.add_argument('--knowledge', type=str, default='knowledge.json', help='知识库文件路径')
+    parser.add_argument('--skip_baseline', action='store_true', help='跳过基线模拟')
+    parser.add_argument('--ascii', action='store_true', help='使用ASCII模式（避免中文渲染问题）')
+    parser.add_argument('--font', type=str, help='指定用于图表显示的字体')
+    return parser.parse_args()
+
 def main():
     """
     主函数，运行餐厅配送模拟
     """
     # 解析命令行参数
-    parser = argparse.ArgumentParser(description="餐厅配送机器人模拟")
-    parser.add_argument("--api-key", type=str, help="OpenAI API密钥")
-    parser.add_argument("--config", type=str, default="rag_robot/config.json",
-                        help="配置文件路径")
-    parser.add_argument("--knowledge", type=str, default="rag_robot/knowledge.json",
-                        help="知识库文件路径")
-    parser.add_argument("--skip-baseline", action="store_true", help="跳过基线机器人模拟")
-    args = parser.parse_args()
+    args = parse_arguments()
+    
+    # 设置字体环境变量（如果指定）
+    if args.font:
+        os.environ['MATPLOTLIB_FONT'] = args.font
+        print(f"使用自定义字体: {args.font}")
+    
+    # 设置ASCII模式
+    global ASCII_MODE
+    ASCII_MODE = args.ascii
+    if ASCII_MODE:
+        print("使用ASCII模式显示，避免中文渲染问题")
     
     # 获取API密钥
     api_key = args.api_key
@@ -407,8 +460,10 @@ def ensure_knowledge_file(knowledge_file_path):
     
     print(f"知识库文件不存在，创建示例知识库: {knowledge_file_path}")
     
-    # 创建目录（如果不存在）
-    os.makedirs(os.path.dirname(knowledge_file_path), exist_ok=True)
+    # 创建目录（如果不存在且路径包含目录）
+    dirname = os.path.dirname(knowledge_file_path)
+    if dirname:  # 只有当目录名不为空时才创建目录
+        os.makedirs(dirname, exist_ok=True)
     
     # 创建示例知识库
     example_knowledge = [
@@ -446,8 +501,10 @@ def ensure_config_file(config_file_path, api_key=None):
     
     print(f"配置文件不存在，创建示例配置: {config_file_path}")
     
-    # 创建目录（如果不存在）
-    os.makedirs(os.path.dirname(config_file_path), exist_ok=True)
+    # 创建目录（如果不存在且路径包含目录）
+    dirname = os.path.dirname(config_file_path)
+    if dirname:  # 只有当目录名不为空时才创建目录
+        os.makedirs(dirname, exist_ok=True)
     
     # 创建示例配置
     example_config = {

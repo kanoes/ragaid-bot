@@ -1,5 +1,3 @@
-# restaurant_grid.py
-
 class RestaurantEnvironment:
     """
     模拟餐厅环境，使用2D网格表示：

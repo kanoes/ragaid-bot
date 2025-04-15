@@ -1,26 +1,35 @@
 # RAG机器人模拟项目
 
 这个项目使用面向对象的设计方法，模拟了两种机器人在餐厅环境中的路径规划和导航：
-1. 基线机器人 (BaselineRobot)：基本的路径规划功能，遇到障碍则停止
-2. RAG机器人 (RagRobot)：使用OpenAI API和向量数据库实现检索增强生成技术，能够在遇到障碍时进行决策并重新规划路径
+1. 基础机器人：基本的路径规划功能，遇到障碍则停止
+2. 智能机器人：使用OpenAI API和向量数据库实现检索增强生成技术，能够在遇到障碍时进行决策并重新规划路径
 
 ## 项目结构
 
 ```
 project/
-├── restaurant_grid.py       # 餐厅环境网格模拟
-├── restaurant_layout.py     # 创建带有20张桌子的餐厅布局
-├── path_planner.py          # A*路径规划算法
-├── robot.py                 # 机器人基类
-├── order.py                 # 订单系统
-├── visualization.py         # 可视化模块（轨迹动画）
-├── main.py                  # 主程序（包含模拟运行逻辑）
-├── baseline/                # 基线机器人
-│   └── robot_baseline.py
-└── rag_robot/               # RAG机器人
-    ├── robot_rag.py         # RAG机器人实现
-    ├── config_example.json  # 配置文件示例
-    └── knowledge_example.json # 知识库文件示例
+├── main.py                 # 主程序（包含模拟运行逻辑）
+├── modules/                # 模块化项目结构
+│   ├── robot/              # 机器人模块
+│   │   ├── __init__.py     
+│   │   └── robot.py        # 机器人通用实现（可通过参数启用RAG）
+│   ├── environment/        # 环境模块
+│   │   ├── __init__.py
+│   │   ├── restaurant_grid.py    # 餐厅环境网格模拟
+│   │   └── restaurant_layout.py  # 创建带有20张桌子的餐厅布局
+│   ├── utils/              # 工具模块
+│   │   ├── __init__.py
+│   │   ├── path_planner.py       # A*路径规划算法
+│   │   ├── order.py              # 订单系统
+│   │   └── visualization.py      # 可视化模块（轨迹动画）
+│   └── rag/                # RAG模块
+│       ├── __init__.py
+│       ├── rag_assistant.py      # RAG助手实现
+│       ├── config/               # 配置文件目录
+│       │   └── config.json       # RAG配置
+│       └── knowledge/            # 知识库目录
+│           └── knowledge.json    # 知识库文件
+└── README.md               # 项目说明文档
 ```
 
 ## 功能特点
@@ -37,8 +46,8 @@ project/
   - 厨房模拟（同时处理多个订单）
 
 - **机器人模拟**：
-  - 基线机器人：遇到障碍停止并失败
-  - RAG机器人：使用OpenAI API和向量数据库实现检索增强生成技术，能够在遇到障碍时进行决策并寻找替代路径
+  - 基础机器人：遇到障碍停止并失败
+  - 智能机器人：使用OpenAI API和向量数据库实现检索增强生成技术，能够在遇到障碍时进行决策并寻找替代路径
 
 - **比较分析**：
   - 比较不同机器人的配送效率
@@ -47,7 +56,7 @@ project/
 
 ## RAG机器人特性
 
-RAG机器人使用OpenAI API和向量数据库实现检索增强生成技术：
+智能机器人使用OpenAI API和向量数据库实现检索增强生成技术：
 
 1. **知识库管理**：
    - 支持从JSON文件加载知识
@@ -95,12 +104,12 @@ python main.py --config path/to/config.json --knowledge path/to/knowledge.json
 
 ## 创建自定义知识库
 
-1. 复制`rag_robot/knowledge_example.json`到`rag_robot/knowledge.json`
+1. 复制`modules/rag/knowledge/knowledge.json`到新文件
 2. 编辑该文件，添加您的知识条目。文件格式为JSON数组，每个元素是一个字符串，描述机器人应该了解的一条知识
 
 ## 配置RAG机器人
 
-1. 复制`rag_robot/config_example.json`到`rag_robot/config.json`
+1. 复制`modules/rag/config/config.json`到新文件
 2. 编辑该文件，设置您的OpenAI API密钥和其他参数
 
 ## 订单输入示例
@@ -116,9 +125,9 @@ python main.py --config path/to/config.json --knowledge path/to/knowledge.json
 - Python 3.6+
 - matplotlib
 - threading
-- OpenAI API (用于RAG机器人)
-- FAISS (用于RAG机器人)
-- numpy (用于RAG机器人)
+- OpenAI API (用于智能机器人)
+- FAISS (用于智能机器人)
+- numpy (用于智能机器人)
 
 ## 如何扩展
 

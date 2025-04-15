@@ -1,6 +1,4 @@
-# restaurant_layout.py
-
-from restaurant_grid import RestaurantEnvironment
+from modules.environment.restaurant_grid import RestaurantEnvironment
 import queue
 
 def create_restaurant_layout():
