@@ -89,15 +89,15 @@ python main.py --rag real --config rag_robot/config.json --knowledge rag_robot/k
 5. 然后运行真实RAG机器人模拟
 6. 最后比较两种机器人的性能差异
 
-## 自定义RealRagRobot类
+## 自定义RagRobot类
 
-如果您想要在自己的代码中使用RealRagRobot类，可以参考以下示例：
+如果您想要在自己的代码中使用RagRobot类，可以参考以下示例：
 
 ```python
-from rag_robot.robot_rag import RealRagRobot
+from rag_robot.robot_rag import RagRobot
 
 # 创建机器人实例
-robot = RealRagRobot(
+robot = RagRobot(
     environment=my_environment,
     api_key="your-openai-api-key",
     config_file="path/to/config.json",

@@ -33,6 +33,8 @@ class RagRobot(Robot):
         super().__init__(environment, start, goal, robot_id)
         self.name = "RAG机器人"
         
+        print(f"\n===== 初始化RAG机器人 #{robot_id} =====")
+        
         # 用于记忆障碍物位置
         self.obstacle_memory = {}
         
@@ -45,6 +47,10 @@ class RagRobot(Robot):
             "top_k": 3  # 检索的文档数量
         }
         
+        print(f"初始API密钥: {'已设置' if api_key else '未设置'}")
+        print(f"配置文件: {config_file if config_file else '未指定'}")
+        print(f"知识库文件: {knowledge_file if knowledge_file else '未指定'}")
+        
         # 如果提供了配置文件，则从文件加载配置
         if config_file and os.path.exists(config_file):
             self._load_config(config_file)
@@ -56,6 +62,13 @@ class RagRobot(Robot):
         # 加载知识库
         if knowledge_file and os.path.exists(knowledge_file):
             self.load_knowledge_from_file(knowledge_file)
+        else:
+            print(f"警告: 知识库文件不存在或未指定 {knowledge_file}")
+            
+        # 检查初始化状态
+        is_ready = self.openai_client is not None and len(self.documents) > 0
+        print(f"RAG机器人初始化完成。RAG功能{'已准备就绪' if is_ready else '未就绪 - 将使用备选决策'}")
+        print("==========================================\n")
     
     def _load_config(self, config_file):
         """加载配置文件"""
@@ -204,12 +217,22 @@ class RagRobot(Robot):
         """
         使用RAG技术处理障碍物
         """
-        print(f"{self.name}#{self.robot_id} - 在 {obstacle_position} 处遇到障碍。")
+        print(f"\n===== {self.name}#{self.robot_id} - 处理障碍物 =====")
+        print(f"障碍物位置: {obstacle_position}")
+        
+        # 检查该位置是否真的是障碍
+        x, y = obstacle_position
+        if 0 <= x < self.env.height and 0 <= y < self.env.width:
+            grid_value = self.env.grid[x][y]
+            print(f"该位置的网格值: {grid_value} (0=空地, 1=障碍物, 2=桌子, 3=后厨)")
         
         # 检查是否短时间内重复遇到同一障碍
         current_time = time.time()
         if obstacle_position in self.obstacle_memory:
-            time_diff = current_time - self.obstacle_memory[obstacle_position]
+            last_time = self.obstacle_memory[obstacle_position]
+            time_diff = current_time - last_time
+            print(f"上次遇到此障碍: {time_diff:.2f}秒前")
+            
             if time_diff < 5:  # 5秒内重复遇到同一障碍
                 print(f"{self.name}#{self.robot_id} - 短时间内再次遇到同一障碍，可能是永久性障碍")
                 # 使用"blocked_path"策略
@@ -218,6 +241,7 @@ class RagRobot(Robot):
                 # 使用普通的"obstacle"策略
                 decision = self.rag_decision("obstacle", obstacle_position)
         else:
+            print(f"首次遇到此障碍")
             # 首次遇到此障碍
             decision = self.rag_decision("obstacle", obstacle_position)
         
@@ -226,9 +250,11 @@ class RagRobot(Robot):
         
         # 根据决策选择行动
         if decision == "绕行" or decision == "重新规划" or decision == "探索新路径":
+            print(f"决策: {decision} - 尝试找到替代路径")
             # 尝试找到绕开当前障碍的路径
             self.find_alternative_path(obstacle_position)
         elif decision == "等待" or decision == "等待片刻后重试":
+            print(f"决策: {decision} - 等待后再尝试")
             # 模拟等待
             print(f"{self.name}#{self.robot_id} - 等待片刻后再尝试...")
             time.sleep(0.5)  # 模拟等待0.5秒
@@ -236,21 +262,27 @@ class RagRobot(Robot):
             if len(self.path) > 1:
                 self.path.pop(0)
         elif decision == "报告无法达到":
+            print(f"决策: {decision} - 放弃当前任务")
             print(f"{self.name}#{self.robot_id} - 路径完全阻塞，无法到达目标")
             if self.current_order:
                 self.fail_current_order("路径被阻塞，无法到达目标桌位")
             else:
                 # 如果没有当前订单，尝试返回后厨
                 self.return_to_kitchen()
+        
+        print(f"===== 障碍物处理完成 =====\n")
     
     def rag_decision(self, situation_type, context=None):
         """
         使用RAG技术进行决策
         """
+        print(f"\n==== RAG决策开始 - 情境: {situation_type} ====")
         # 如果OpenAI客户端未初始化或知识库为空，使用备选决策方法
         if not self.openai_client or not self.documents:
             print("警告: 使用备选决策方法 (OpenAI未配置或知识库为空)")
-            return self._fallback_decision(situation_type)
+            fallback = self._fallback_decision(situation_type)
+            print(f"备选决策结果: {fallback}")
+            return fallback
         
         try:
             import numpy as np
@@ -268,17 +300,22 @@ class RagRobot(Robot):
             print(f"{self.name}#{self.robot_id} - RAG查询: {query}")
             
             # 生成查询嵌入
+            print("生成查询嵌入...")
             query_embedding_response = self.openai_client.embeddings.create(
                 input=query,
                 model=self.config["embedding_model"]
             )
+            print("查询嵌入生成成功")
             query_embedding = np.array([query_embedding_response.data[0].embedding], dtype=np.float32)
             
             # 检索相关文档
+            print(f"从知识库中检索文档 (共 {len(self.documents)} 条)...")
             D, I = self.faiss_index.search(query_embedding, min(self.config["top_k"], len(self.documents)))
             retrieved_docs = [self.documents[i] for i in I[0]]
+            print(f"检索到 {len(retrieved_docs)} 条相关文档")
             
             # 构建提示
+            print("构建提示...")
             system_prompt = (
                 "你是一个智能送餐机器人的决策系统。你需要根据当前情况和检索到的相关知识，"
                 "决定最佳的行动方案。只返回一个行动，不要解释。"
@@ -291,8 +328,12 @@ class RagRobot(Robot):
 障碍位置: {context}
 
 检索到的相关知识:
-{''.join([f"- {doc}\n" for doc in retrieved_docs])}
-
+"""
+            # 添加检索到的文档
+            for doc in retrieved_docs:
+                user_prompt += f"- {doc}\n"
+                
+            user_prompt += """
 请从以下选项中选择一个最佳行动(只返回行动名称):
 - 重新规划
 - 绕行
@@ -301,6 +342,7 @@ class RagRobot(Robot):
 """
             
             # 调用OpenAI API
+            print("调用OpenAI API...")
             response = self.openai_client.chat.completions.create(
                 model=self.config["completion_model"],
                 messages=[
@@ -313,20 +355,27 @@ class RagRobot(Robot):
             
             # 获取决策
             decision = response.choices[0].message.content.strip()
+            print(f"API返回原始决策: {decision}")
             
             # 标准化决策，确保返回的是预定义的动作之一
             valid_actions = ["重新规划", "绕行", "等待", "报告无法达到"]
             for action in valid_actions:
                 if action in decision:
+                    print(f"最终决策: {action}")
+                    print("==== RAG决策结束 ====\n")
                     return action
             
             # 如果不匹配任何预定义动作，返回原始响应
+            print(f"决策不匹配预定义动作，返回原始响应: {decision}")
+            print("==== RAG决策结束 ====\n")
             return decision
             
         except Exception as e:
             print(f"RAG决策出错: {e}")
             # 出错时使用备选决策
-            return self._fallback_decision(situation_type)
+            fallback = self._fallback_decision(situation_type)
+            print(f"备选决策结果: {fallback}")
+            return fallback
     
     def _fallback_decision(self, situation_type):
         """当RAG决策失败时的备选决策方法"""
@@ -433,4 +482,90 @@ class RagRobot(Robot):
             
         finally:
             # 恢复原始网格状态
-            self.env.grid = [row.copy() for row in original_grid] 
+            self.env.grid = [row.copy() for row in original_grid]
+    
+    def test_obstacle_handling(self, obstacle_type="random"):
+        """
+        测试函数：在机器人前方放置障碍物，测试障碍物处理逻辑
+        
+        参数:
+            obstacle_type: 障碍物类型，可以是"random"（默认）、"permanent"或"temporary"
+        """
+        if not self.path or len(self.path) < 2:
+            print("路径太短，无法测试障碍物处理")
+            return False
+        
+        print("\n===== 开始障碍物处理测试 =====")
+        print(f"测试障碍物类型: {obstacle_type}")
+        
+        # 获取机器人计划前进的下一个位置
+        next_position = self.path[1]
+        print(f"在下一位置 {next_position} 放置测试障碍")
+        
+        # 保存原始网格状态
+        x, y = next_position
+        original_value = self.env.grid[x][y]
+        
+        try:
+            # 在下一个位置放置障碍物
+            self.env.grid[x][y] = 1  # 1表示障碍物
+            
+            # 如果是永久性障碍，预先记录在记忆中
+            if obstacle_type == "permanent":
+                self.obstacle_memory[next_position] = time.time() - 10  # 10秒前就遇到过
+                print("模拟为永久性障碍（记录为曾经遇到过）")
+            
+            # 尝试移动，会触发障碍物处理
+            self.move()
+            
+            # 如果是临时障碍，等待后移除
+            if obstacle_type == "temporary":
+                print("模拟临时障碍物被移除")
+                self.env.grid[x][y] = original_value
+            
+            print("===== 障碍物处理测试完成 =====\n")
+            return True
+        finally:
+            # 恢复原始网格状态
+            self.env.grid[x][y] = original_value
+    
+    def comprehensive_test(self):
+        """
+        综合测试：测试各种障碍物处理情境
+        """
+        if not self.path or len(self.path) < 3:
+            print("路径太短，无法进行综合测试")
+            return False
+        
+        print("\n===== 开始综合测试 =====")
+        
+        # 测试临时障碍物
+        print("\n[测试1] 临时障碍物处理")
+        self.test_obstacle_handling("temporary")
+        
+        # 稍等片刻
+        time.sleep(1)
+        
+        # 测试永久性障碍物
+        print("\n[测试2] 永久性障碍物处理")
+        self.test_obstacle_handling("permanent")
+        
+        # 测试连续障碍物
+        print("\n[测试3] 连续障碍物处理")
+        # 在路径上连续放置多个障碍物
+        if len(self.path) >= 4:
+            obstacle_positions = [self.path[i] for i in range(2, 4)]
+            
+            for i, pos in enumerate(obstacle_positions):
+                print(f"\n测试障碍物 #{i+1} 在位置 {pos}")
+                x, y = pos
+                original_value = self.env.grid[x][y]
+                
+                try:
+                    self.env.grid[x][y] = 1
+                    self.move()
+                finally:
+                    self.env.grid[x][y] = original_value
+        
+        print("\n===== 综合测试完成 =====")
+        return True 

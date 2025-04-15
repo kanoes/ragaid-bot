@@ -6,7 +6,7 @@ import argparse
 import os
 import json
 from restaurant_grid import RestaurantEnvironment
-from restaurant_layout import create_restaurant_layout, print_restaurant_info
+from restaurant_layout import create_restaurant_layout, print_restaurant_info, display_full_restaurant
 from baseline.robot_baseline import BaselineRobot
 from rag_robot.robot_rag import RagRobot
 from visualization import animate_robot_path
@@ -63,9 +63,16 @@ def run_baseline_simulation(restaurant, order_manager, robot_count=1):
                     robot.move()
                     
                     # 检查当前订单状态
-                    if robot.position == robot.goal and robot.current_order:
-                        # 到达目标，完成订单
-                        order_manager.complete_order_delivery(robot.current_order.order_id)
+                    if robot.current_order:
+                        # 检查是否已到达目标
+                        if robot.position == robot.goal:
+                            # 到达目标，完成订单
+                            order_manager.complete_order_delivery(robot.current_order.order_id)
+                        # 检查是否有已送达但未通知订单管理器的订单
+                        elif hasattr(robot.current_order, 'delivered_flag'):
+                            # 订单已送达但可能因返回路径问题还未清除
+                            order_manager.complete_order_delivery(robot.current_order.order_id)
+                            print(f"手动完成订单 #{robot.current_order.order_id} 状态更新（已送达但未返回后厨）")
             
             # 睡眠一段时间模拟真实环境
             time.sleep(0.5)
@@ -75,8 +82,14 @@ def run_baseline_simulation(restaurant, order_manager, robot_count=1):
             if (not order_manager.waiting_orders and 
                 not order_manager.preparing_orders and 
                 not order_manager.ready_orders and
-                all(robot.is_idle() for robot in robots)):
+                not order_manager.delivering_orders and
+                all(robot.current_order is None or hasattr(robot.current_order, 'delivered_flag') for robot in robots)):
                 print("所有订单已处理完成，模拟结束")
+                # 确保所有已送达但未更新状态的订单被正确完成
+                for robot in robots:
+                    if robot.current_order and hasattr(robot.current_order, 'delivered_flag'):
+                        order_manager.complete_order_delivery(robot.current_order.order_id)
+                        robot.current_order = None
                 break
     
     finally:
@@ -154,7 +167,12 @@ def run_rag_simulation(restaurant, order_manager, robot_count=1, api_key=None, c
                     if next_order:
                         # 分配订单给机器人
                         order_manager.assign_order_to_robot(next_order.order_id, robot.robot_id)
-                        robot.assign_order(next_order)
+                        path_success = robot.assign_order(next_order)
+                        
+                        # 如果路径规划成功且是RAG机器人，进行障碍物处理测试
+                        if path_success and isinstance(robot, RagRobot) and simulation_time > 3:
+                            print("\n执行RAG障碍物处理综合测试...")
+                            robot.comprehensive_test()
             
             # 所有机器人执行一步
             for robot in robots:
@@ -162,9 +180,16 @@ def run_rag_simulation(restaurant, order_manager, robot_count=1, api_key=None, c
                     robot.move()
                     
                     # 检查当前订单状态
-                    if robot.position == robot.goal and robot.current_order:
-                        # 到达目标，完成订单
-                        order_manager.complete_order_delivery(robot.current_order.order_id)
+                    if robot.current_order:
+                        # 检查是否已到达目标
+                        if robot.position == robot.goal:
+                            # 到达目标，完成订单
+                            order_manager.complete_order_delivery(robot.current_order.order_id)
+                        # 检查是否有已送达但未通知订单管理器的订单
+                        elif hasattr(robot.current_order, 'delivered_flag'):
+                            # 订单已送达但可能因返回路径问题还未清除
+                            order_manager.complete_order_delivery(robot.current_order.order_id)
+                            print(f"手动完成订单 #{robot.current_order.order_id} 状态更新（已送达但未返回后厨）")
             
             # 睡眠一段时间模拟真实环境
             time.sleep(0.5)
@@ -174,8 +199,14 @@ def run_rag_simulation(restaurant, order_manager, robot_count=1, api_key=None, c
             if (not order_manager.waiting_orders and 
                 not order_manager.preparing_orders and 
                 not order_manager.ready_orders and
-                all(robot.is_idle() for robot in robots)):
+                not order_manager.delivering_orders and
+                all(robot.current_order is None or hasattr(robot.current_order, 'delivered_flag') for robot in robots)):
                 print("所有订单已处理完成，模拟结束")
+                # 确保所有已送达但未更新状态的订单被正确完成
+                for robot in robots:
+                    if robot.current_order and hasattr(robot.current_order, 'delivered_flag'):
+                        order_manager.complete_order_delivery(robot.current_order.order_id)
+                        robot.current_order = None
                 break
     
     finally:
@@ -305,6 +336,7 @@ def main():
                         help="配置文件路径")
     parser.add_argument("--knowledge", type=str, default="rag_robot/knowledge.json",
                         help="知识库文件路径")
+    parser.add_argument("--skip-baseline", action="store_true", help="跳过基线机器人模拟")
     args = parser.parse_args()
     
     # 获取API密钥
@@ -321,9 +353,19 @@ def main():
         if not api_key:
             api_key = ask_for_openai_key()
     
+    # 确保配置文件存在
+    ensure_config_file(args.config, api_key)
+    
+    # 确保知识库文件存在
+    ensure_knowledge_file(args.knowledge)
+    
     # 创建餐厅环境
     restaurant = create_restaurant_layout()
     print_restaurant_info(restaurant)
+    
+    # 显示详细餐厅布局（包括坐标）
+    kitchen_pos = restaurant.get_kitchen_positions()[0]
+    display_full_restaurant(restaurant, kitchen_pos)
     
     # 输入订单
     order_manager = input_orders()
@@ -333,12 +375,14 @@ def main():
         return
     
     # 运行基线机器人模拟
-    baseline_order_manager = OrderManager()
-    # 复制订单到新的订单管理器
-    for order in order_manager.orders.values():
-        baseline_order_manager.create_order(order.table_id, order.prep_time, order.items)
-    
-    baseline_stats = run_baseline_simulation(restaurant, baseline_order_manager)
+    baseline_stats = None
+    if not args.skip_baseline:
+        baseline_order_manager = OrderManager()
+        # 复制订单到新的订单管理器
+        for order in order_manager.orders.values():
+            baseline_order_manager.create_order(order.table_id, order.prep_time, order.items)
+        
+        baseline_stats = run_baseline_simulation(restaurant, baseline_order_manager)
     
     # 运行RAG机器人模拟
     rag_order_manager = OrderManager()
@@ -347,12 +391,77 @@ def main():
         rag_order_manager.create_order(order.table_id, order.prep_time, order.items)
     
     rag_stats = run_rag_simulation(restaurant, rag_order_manager,
-                                   api_key=api_key,
-                                   config_file=args.config,
-                                   knowledge_file=args.knowledge)
+                                 api_key=api_key,
+                                 config_file=args.config,
+                                 knowledge_file=args.knowledge)
     
     # 比较两种机器人的表现
-    compare_simulation_results(baseline_stats, rag_stats)
+    if baseline_stats:
+        compare_simulation_results(baseline_stats, rag_stats)
+
+def ensure_knowledge_file(knowledge_file_path):
+    """确保知识库文件存在，如果不存在则创建示例知识库"""
+    if os.path.exists(knowledge_file_path):
+        print(f"知识库文件已存在: {knowledge_file_path}")
+        return
+    
+    print(f"知识库文件不存在，创建示例知识库: {knowledge_file_path}")
+    
+    # 创建目录（如果不存在）
+    os.makedirs(os.path.dirname(knowledge_file_path), exist_ok=True)
+    
+    # 创建示例知识库
+    example_knowledge = [
+        "当机器人遇到障碍物时，应该先评估障碍物的性质。如果是临时障碍，可以短暂等待后重试；如果是永久性障碍，应该重新规划路径。",
+        "在餐厅环境中，拥挤区域通常是临时性障碍，机器人应该减速并等待通行。",
+        "如果短时间内多次遇到同一位置的障碍物，说明该障碍物可能是永久性的，应该尝试寻找替代路径。",
+        "当机器人无法找到任何可行路径时，应该报告无法到达目标。",
+        "如果遇到移动的人或物体，应该等待其通过，而不是尝试绕行。",
+        "如果目标周围被障碍物包围，应该等待一段时间后再尝试接近，因为障碍物可能是临时的。",
+        "在通行量大的区域，机器人应该尽量靠边行驶，避免阻碍其他人的通行。",
+        "当多次尝试绕行都失败时，机器人应该考虑完全不同的路径，即使路径更长。"
+    ]
+    
+    with open(knowledge_file_path, 'w', encoding='utf-8') as f:
+        json.dump(example_knowledge, f, ensure_ascii=False, indent=2)
+    
+    print(f"示例知识库创建成功，包含 {len(example_knowledge)} 条知识条目")
+
+def ensure_config_file(config_file_path, api_key=None):
+    """确保配置文件存在，如果不存在则创建示例配置"""
+    if os.path.exists(config_file_path):
+        print(f"配置文件已存在: {config_file_path}")
+        # 如果提供了API密钥，更新现有配置
+        if api_key:
+            try:
+                with open(config_file_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                config["api_key"] = api_key
+                with open(config_file_path, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, ensure_ascii=False, indent=2)
+                print(f"已更新配置文件中的API密钥")
+            except Exception as e:
+                print(f"更新配置文件出错: {e}")
+        return
+    
+    print(f"配置文件不存在，创建示例配置: {config_file_path}")
+    
+    # 创建目录（如果不存在）
+    os.makedirs(os.path.dirname(config_file_path), exist_ok=True)
+    
+    # 创建示例配置
+    example_config = {
+        "api_key": api_key or "",
+        "embedding_model": "text-embedding-ada-002",
+        "completion_model": "gpt-3.5-turbo",
+        "temperature": 0.3,
+        "top_k": 3
+    }
+    
+    with open(config_file_path, 'w', encoding='utf-8') as f:
+        json.dump(example_config, f, ensure_ascii=False, indent=2)
+    
+    print(f"示例配置文件创建成功")
 
 if __name__ == "__main__":
     main() 

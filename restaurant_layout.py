@@ -1,6 +1,7 @@
 # restaurant_layout.py
 
 from restaurant_grid import RestaurantEnvironment
+import queue
 
 def create_restaurant_layout():
     """
@@ -35,20 +36,23 @@ def create_restaurant_layout():
             grid[i][j] = 3
             kitchen_positions.append((i, j))
     
-    # 在后厨区域添加一个出口
-    grid[5][4] = 0  # 后厨出口
+    # 在后厨区域添加出口
+    grid[5][4] = 0  # 主要后厨出口
+    grid[3][7] = 0  # 额外的后厨出口
     
     # 添加中央装饰/障碍物
     for i in range(8, 12):
         for j in range(8, 12):
             grid[i][j] = 1
     
-    # 添加部分内部墙壁/隔断
+    # 添加部分内部墙壁/隔断（但确保有足够通道）
     for i in range(5, 15):
-        grid[i][15] = 1
+        if i != 7 and i != 10 and i != 12:  # 添加多个通道
+            grid[i][15] = 1
     
     for j in range(5, 15):
-        grid[5][j] = 1
+        if j != 7 and j != 10 and j != 13:  # 添加多个通道
+            grid[5][j] = 1
     
     # 在隔断上添加通道
     grid[5][10] = 0
@@ -78,6 +82,25 @@ def create_restaurant_layout():
         20: (12, 17)
     }
     
+    # 确保每张桌子周围有空位，用于机器人配送
+    for position in table_positions.values():
+        x, y = position
+        # 确保桌子周围至少有一个空位
+        has_empty = False
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < height and 0 <= ny < width and grid[nx][ny] == 0:
+                has_empty = True
+                break
+        
+        # 如果没有空位，强制创建一个
+        if not has_empty:
+            for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < height and 0 <= ny < width and grid[nx][ny] == 1:
+                    grid[nx][ny] = 0  # 将障碍物改为空位
+                    break
+    
     # 创建餐厅环境
     restaurant = RestaurantEnvironment(grid)
     
@@ -89,7 +112,61 @@ def create_restaurant_layout():
     for pos in kitchen_positions:
         restaurant.add_kitchen(pos)
     
+    # 连通性检查并修复
+    verify_and_fix_connectivity(restaurant, kitchen_positions[0], table_positions)
+    
     return restaurant
+
+def verify_and_fix_connectivity(restaurant, start, destinations):
+    """检查从起点到所有目的地的连通性，并修复不连通的路径"""
+    print("正在检查餐厅布局连通性...")
+    
+    # 使用BFS检查连通性
+    height, width = restaurant.height, restaurant.width
+    for dest_id, dest in destinations.items():
+        if not is_connected(restaurant, start, dest):
+            print(f"警告: 桌号 {dest_id} 在位置 {dest} 与后厨不连通，尝试修复...")
+            create_path(restaurant, start, dest)
+    
+    print("连通性检查完成")
+
+def is_connected(restaurant, start, end):
+    """检查两点之间是否连通"""
+    visited = set()
+    q = queue.Queue()
+    q.put(start)
+    visited.add(start)
+    
+    while not q.empty():
+        current = q.get()
+        if current == end:
+            return True
+        
+        for neighbor in restaurant.neighbors(current):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                q.put(neighbor)
+    
+    return False
+
+def create_path(restaurant, start, end):
+    """创建从start到end的直线路径"""
+    x1, y1 = start
+    x2, y2 = end
+    
+    # 先水平方向
+    for y in range(min(y1, y2), max(y1, y2) + 1):
+        if 0 <= x1 < restaurant.height and 0 <= y < restaurant.width:
+            if restaurant.grid[x1][y] == 1:  # 如果是障碍物
+                restaurant.grid[x1][y] = 0   # 改为通道
+                print(f"  在 ({x1}, {y}) 处创建通道")
+    
+    # 再垂直方向
+    for x in range(min(x1, x2), max(x1, x2) + 1):
+        if 0 <= x < restaurant.height and 0 <= y2 < restaurant.width:
+            if restaurant.grid[x][y2] == 1:  # 如果是障碍物
+                restaurant.grid[x][y2] = 0   # 改为通道
+                print(f"  在 ({x}, {y2}) 处创建通道")
 
 def print_restaurant_info(restaurant):
     """打印餐厅信息摘要"""
@@ -105,4 +182,38 @@ def print_restaurant_info(restaurant):
     
     # 显示整个餐厅布局
     print("\n餐厅布局:")
-    restaurant.display() 
+    restaurant.display()
+
+def display_full_restaurant(restaurant, kitchen_position=None):
+    """显示整个餐厅布局，并用表格形式标记每个单元格的坐标"""
+    print("\n===== 详细餐厅布局 =====")
+    print("  ", end="")
+    for j in range(restaurant.width):
+        print(f"{j:2d}", end=" ")
+    print("\n" + "-" * (restaurant.width * 3 + 3))
+    
+    for i in range(restaurant.height):
+        print(f"{i:2d}|", end="")
+        for j in range(restaurant.width):
+            cell = (i, j)
+            if kitchen_position and cell == kitchen_position:
+                print(" K ", end="")
+            elif restaurant.is_kitchen(cell):
+                print(" ▣ ", end="")
+            elif restaurant.is_table(cell):
+                # 查找桌号
+                table_id = None
+                for tid, pos in restaurant.tables.items():
+                    if pos == cell:
+                        table_id = tid
+                        break
+                if table_id is not None:
+                    print(f"{table_id:2d}", end=" ")
+                else:
+                    print(" ◇ ", end="")
+            elif restaurant.is_free(cell):
+                print(" · ", end="")
+            else:
+                print(" █ ", end="")
+        print()
+    print() 
