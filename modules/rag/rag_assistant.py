@@ -5,67 +5,67 @@ import numpy as np
 from typing import List, Dict, Any, Optional, Tuple, Union
 import dotenv
 
-# 自动加载环境变量
+# 自動的に環境変数をロードする
 dotenv.load_dotenv()
 
-# 尝试导入OpenAI和FAISS
+# OpenAIとFAISSのインポートを試みる
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    print("警告: OpenAI库未安装，RAG功能将不可用")
+    print("警告: OpenAIライブラリがインストールされていません、RAG機能は利用できません")
 
 try:
     import faiss
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
-    print("警告: FAISS库未安装，RAG功能将不可用")
+    print("警告: FAISSライブラリがインストールされていません、RAG機能は利用できません")
 
 class RagAssistant:
     """
-    RAG（检索增强生成）助手类
-    负责知识库管理和基于知识的决策
+    RAG（検索拡張生成）アシスタントクラス
+    知識ベース管理と知識に基づく意思決定を担当
     """
     
     def __init__(self, api_key=None, knowledge_file=None):
         """
-        初始化RAG助手
+        RAGアシスタントを初期化
         
-        参数:
-            api_key: OpenAI API密钥
-            knowledge_file: 知识库文件路径
+        パラメータ:
+            api_key: OpenAI APIキー
+            knowledge_file: 知識ベースファイルのパス
         """
-        # 从环境变量或参数获取API密钥
+        # 環境変数またはパラメータからAPIキーを取得
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self.knowledge_file = knowledge_file
         
-        # 从环境变量获取配置
+        # 環境変数から設定を取得
         self.embedding_model = os.environ.get("EMBEDDING_MODEL", "text-embedding-ada-002")
         self.completion_model = os.environ.get("COMPLETION_MODEL", "gpt-3.5-turbo")
         self.temperature = float(os.environ.get("TEMPERATURE", "0.0"))
         self.top_k = int(os.environ.get("TOP_K", "3"))
         
-        # 初始化状态
+        # 状態を初期化
         self.client = None
         self.documents = []
         self.embeddings = None
         self.index = None
         self.is_ready = False
         
-        # 初始化OpenAI客户端
+        # OpenAIクライアントを初期化
         self.init_openai()
         
-        # 初始化向量存储
+        # ベクトルストレージを初期化
         if knowledge_file:
             self.load_knowledge()
         
-        # 验证是否就绪
+        # 準備完了かどうかを確認
         self.check_ready()
     
     def check_ready(self):
-        """验证是否所有组件都已就绪"""
+        """すべてのコンポーネントが準備完了か確認"""
         self.is_ready = (
             OPENAI_AVAILABLE and 
             FAISS_AVAILABLE and 
@@ -77,113 +77,113 @@ class RagAssistant:
         return self.is_ready
     
     def init_openai(self):
-        """初始化OpenAI客户端"""
+        """OpenAIクライアントを初期化"""
         if not OPENAI_AVAILABLE:
-            print("OpenAI库未安装，无法初始化客户端")
+            print("OpenAIライブラリがインストールされていません、クライアントを初期化できません")
             return False
         
         if not self.api_key:
-            print("未提供OpenAI API密钥，无法初始化客户端")
+            print("OpenAI APIキーが提供されていません、クライアントを初期化できません")
             return False
         
         try:
             self.client = OpenAI(api_key=self.api_key)
-            print("OpenAI客户端初始化成功")
+            print("OpenAIクライアントの初期化に成功しました")
             return True
         except Exception as e:
-            print(f"初始化OpenAI客户端时出错: {e}")
+            print(f"OpenAIクライアントの初期化中にエラーが発生しました: {e}")
             return False
     
     def load_knowledge(self):
-        """从知识库文件加载知识并创建向量索引"""
+        """知識ベースファイルから知識を読み込み、ベクトルインデックスを作成"""
         if not os.path.exists(self.knowledge_file):
-            print(f"知识库文件 {self.knowledge_file} 不存在")
+            print(f"知識ベースファイル {self.knowledge_file} が存在しません")
             return False
         
         try:
             with open(self.knowledge_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # 处理不同的知识库格式
+            # 異なる知識ベース形式を処理
             if isinstance(data, list):
                 self.documents = data
             elif isinstance(data, dict) and "documents" in data:
                 self.documents = data["documents"]
             else:
-                print(f"知识库格式不正确: {self.knowledge_file}")
+                print(f"知識ベースの形式が正しくありません: {self.knowledge_file}")
                 return False
             
-            print(f"已加载 {len(self.documents)} 条知识条目")
+            print(f"{len(self.documents)} 件の知識項目を読み込みました")
             
-            # 生成嵌入
+            # 埋め込みを生成
             self.create_embeddings()
             return True
         except Exception as e:
-            print(f"加载知识库时出错: {e}")
+            print(f"知識ベースの読み込み中にエラーが発生しました: {e}")
             return False
     
     def create_embeddings(self):
-        """为知识条目创建嵌入向量并建立索引"""
+        """知識項目の埋め込みベクトルを作成し、インデックスを構築"""
         if not self.client or not self.documents:
             return False
         
         try:
-            # 提取文本内容
+            # テキスト内容を抽出
             texts = [doc["content"] if isinstance(doc, dict) and "content" in doc else str(doc) 
                     for doc in self.documents]
             
-            print(f"为 {len(texts)} 条知识条目创建嵌入...")
+            print(f"{len(texts)} 件の知識項目の埋め込みを作成中...")
             
-            # 批量创建嵌入
+            # バッチで埋め込みを作成
             response = self.client.embeddings.create(
                 model=self.embedding_model,
                 input=texts
             )
             
-            # 提取嵌入向量
+            # 埋め込みベクトルを抽出
             self.embeddings = np.array([item.embedding for item in response.data])
             
-            # 创建FAISS索引
+            # FAISSインデックスを作成
             vector_dimension = len(self.embeddings[0])
             self.index = faiss.IndexFlatL2(vector_dimension)
             self.index.add(self.embeddings.astype('float32'))
             
-            print(f"成功创建 {len(self.embeddings)} 个嵌入向量，维度为 {vector_dimension}")
+            print(f"{len(self.embeddings)} 個の埋め込みベクトルを次元 {vector_dimension} で作成しました")
             return True
         except Exception as e:
-            print(f"创建嵌入时出错: {e}")
+            print(f"埋め込み作成中にエラーが発生しました: {e}")
             return False
     
     def search_knowledge(self, query: str, top_k: int = None) -> List[Dict]:
         """
-        搜索与查询最相关的知识条目
+        クエリに最も関連する知識項目を検索
         
-        参数:
-            query: 查询文本
-            top_k: 返回的结果数量
+        パラメータ:
+            query: クエリテキスト
+            top_k: 返す結果の数
         
-        返回:
-            相关知识条目列表
+        戻り値:
+            関連知識項目のリスト
         """
         if not self.is_ready:
-            print("RAG助手未就绪，无法搜索知识")
+            print("RAGアシスタントの準備ができていません、知識を検索できません")
             return []
         
         if top_k is None:
             top_k = self.top_k
         
         try:
-            # 获取查询的嵌入向量
+            # クエリの埋め込みベクトルを取得
             query_embedding_response = self.client.embeddings.create(
                 model=self.embedding_model,
                 input=[query]
             )
             query_embedding = np.array([query_embedding_response.data[0].embedding]).astype('float32')
             
-            # 使用FAISS搜索最近邻
+            # FAISSで最近傍を検索
             distances, indices = self.index.search(query_embedding, top_k)
             
-            # 提取相关文档
+            # 関連文書を抽出
             results = []
             for i, idx in enumerate(indices[0]):
                 if idx < len(self.documents):
@@ -191,53 +191,53 @@ class RagAssistant:
                     results.append({
                         "document": doc,
                         "distance": float(distances[0][i]),
-                        "relevance_score": 1.0 - float(distances[0][i]) / 2.0  # 简单转换为相关性分数
+                        "relevance_score": 1.0 - float(distances[0][i]) / 2.0  # 関連性スコアに簡単に変換
                     })
             
             return results
         except Exception as e:
-            print(f"搜索知识库时出错: {e}")
+            print(f"知識ベース検索中にエラーが発生しました: {e}")
             return []
     
     def make_decision(self, situation_type: str, **context) -> str:
         """
-        基于当前情况和知识库做出决策
+        現在の状況と知識ベースに基づいて意思決定を行う
         
-        参数:
-            situation_type: 情境类型（如"obstacle", "table_selection"等）
-            **context: 上下文参数（如机器人位置、目标等）
+        パラメータ:
+            situation_type: 状況タイプ（例: "obstacle", "table_selection"など）
+            **context: コンテキストパラメータ（例: ロボットの位置、目標など）
         
-        返回:
-            决策结果
+        戻り値:
+            意思決定結果
         """
         if not self.is_ready:
-            print("RAG助手未就绪，无法做出决策")
-            return "无法决策"
+            print("RAGアシスタントの準備ができていません、意思決定できません")
+            return "意思決定できません"
         
-        # 构建提示
+        # プロンプトを構築
         if situation_type == "obstacle":
             query = self.build_obstacle_query(**context)
-            system_prompt = "你是一个智能机器人助手，负责帮助送餐机器人处理复杂情况。请根据提供的信息，做出最合理的决策。"
+            system_prompt = "あなたはインテリジェントロボットアシスタントで、配膳ロボットが複雑な状況を処理するのを支援します。提供された情報に基づいて、最も合理的な決定を下してください。"
         else:
-            query = f"机器人需要在{situation_type}情况下做出决策。上下文：{context}"
-            system_prompt = "你是一个智能机器人助手，负责帮助送餐机器人处理各种情况。"
+            query = f"ロボットは{situation_type}状況で意思決定を行う必要があります。コンテキスト：{context}"
+            system_prompt = "あなたはインテリジェントロボットアシスタントで、配膳ロボットがさまざまな状況を処理するのを支援します。"
         
-        # 检索相关知识
+        # 関連知識を検索
         relevant_docs = self.search_knowledge(query)
         
-        # 构建包含相关知识的提示
+        # 関連知識を含むプロンプトを構築
         knowledge_context = ""
         if relevant_docs:
-            knowledge_context = "相关知识：\n"
+            knowledge_context = "関連知識：\n"
             for i, doc in enumerate(relevant_docs):
                 content = doc["document"]["content"] if isinstance(doc["document"], dict) and "content" in doc["document"] else str(doc["document"])
                 knowledge_context += f"{i+1}. {content}\n"
         
-        # 生成最终提示
+        # 最終プロンプトを生成
         full_prompt = f"{query}\n\n{knowledge_context}"
         
         try:
-            # 调用OpenAI生成决策
+            # OpenAIを呼び出して決定を生成
             response = self.client.chat.completions.create(
                 model=self.completion_model,
                 messages=[
@@ -250,35 +250,35 @@ class RagAssistant:
             
             decision = response.choices[0].message.content.strip()
             
-            # 简化决策（仅返回核心决策）
+            # 決定を簡略化（コア決定のみを返す）
             simple_decision = self.simplify_decision(decision)
             return simple_decision
         except Exception as e:
-            print(f"生成决策时出错: {e}")
-            return "无法决策"
+            print(f"決定生成中にエラーが発生しました: {e}")
+            return "意思決定できません"
     
     def build_obstacle_query(self, robot_id, position, goal, context, **kwargs) -> str:
-        """构建障碍物处理的查询"""
+        """障害物処理のためのクエリを構築"""
         return (
-            f"机器人#{robot_id}在位置{position}遇到障碍物，目标位置是{goal}，障碍位置是{context}。"
-            f"请分析情况并给出如何处理这个障碍物的决策。"
-            f"可能的决策有：绕行、等待、报告无法达到。"
+            f"ロボット#{robot_id}は位置{position}で障害物に遭遇し、目標位置は{goal}、障害物位置は{context}です。"
+            f"状況を分析し、この障害物をどう処理するかの決定を提供してください。"
+            f"可能な決定：迂回、待機、到達不能を報告。"
         )
     
     def simplify_decision(self, decision: str) -> str:
         """
-        从决策文本中提取核心决策
-        例如从"我建议机器人绕过障碍物，尝试另一条路径"提取为"绕行"
+        決定テキストからコア決定を抽出
+        例えば「ロボットが障害物を回避し、別のルートを試すことをお勧めします」から「迂回」を抽出
         """
         decision = decision.lower()
         
-        # 障碍物处理决策
-        if "绕" in decision or "另一条路" in decision or "新路径" in decision or "重新规划" in decision:
-            return "绕行"
-        elif "等待" in decision:
-            return "等待片刻后重试"
-        elif "无法" in decision or "放弃" in decision or "返回" in decision:
-            return "报告无法达到"
+        # 障害物処理決定
+        if "回避" in decision or "別のルート" in decision or "新しい経路" in decision or "再計画" in decision:
+            return "迂回"
+        elif "待機" in decision:
+            return "しばらく待ってから再試行"
+        elif "不能" in decision or "諦め" in decision or "戻る" in decision:
+            return "到達不能を報告"
         
-        # 如果无法简化，返回原始决策
+        # 簡略化できない場合は元の決定を返す
         return decision 
