@@ -1,0 +1,10 @@
+{
+  "api_key": "your-openai-api-key-here",
+  "embedding_model": "text-embedding-ada-002",
+  "completion_model": "gpt-3.5-turbo",
+  "temperature": 0.3,
+  "top_k": 3,
+  "max_retry_count": 3,
+  "retry_wait_time": 1.0,
+  "log_level": "info"
+} 
