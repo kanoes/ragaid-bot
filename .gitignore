@@ -31,6 +31,5 @@ ENV/
 *.swp
 *.swo
 
-# 项目特定
-modules/rag/config/config.json
-modules/rag/knowledge/knowledge.json
+# 环境变量文件
+.env

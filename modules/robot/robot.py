@@ -15,7 +15,7 @@ class Robot:
     可以通过enable_rag选项启用智能决策能力
     """
     def __init__(self, environment, start=None, goal=None, robot_id=1, 
-                enable_rag=False, api_key=None, config_file=None, knowledge_file=None):
+                enable_rag=False, api_key=None, knowledge_file=None):
         """
         初始化机器人
         
@@ -26,7 +26,6 @@ class Robot:
             robot_id: 机器人ID
             enable_rag: 是否启用RAG功能
             api_key: OpenAI API密钥（仅在enable_rag=True时使用）
-            config_file: 配置文件路径（仅在enable_rag=True时使用）
             knowledge_file: 知识库文件路径（仅在enable_rag=True时使用）
         """
         self.env = environment
@@ -68,7 +67,6 @@ class Robot:
             try:
                 self.rag_assistant = RagAssistant(
                     api_key=api_key,
-                    config_file=config_file,
                     knowledge_file=knowledge_file
                 )
                 print(f"RAG功能{'已就绪' if self.rag_assistant.is_ready else '初始化失败'}")

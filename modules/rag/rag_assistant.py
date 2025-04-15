@@ -3,6 +3,10 @@ import json
 import time
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple, Union
+import dotenv
+
+# 自动加载环境变量
+dotenv.load_dotenv()
 
 # 尝试导入OpenAI和FAISS
 try:
@@ -25,24 +29,23 @@ class RagAssistant:
     负责知识库管理和基于知识的决策
     """
     
-    def __init__(self, api_key=None, config_file=None, knowledge_file=None):
+    def __init__(self, api_key=None, knowledge_file=None):
         """
         初始化RAG助手
         
         参数:
             api_key: OpenAI API密钥
-            config_file: 配置文件路径
             knowledge_file: 知识库文件路径
         """
-        self.api_key = api_key
-        self.config_file = config_file
+        # 从环境变量或参数获取API密钥
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self.knowledge_file = knowledge_file
         
-        # 默认配置
-        self.embedding_model = "text-embedding-ada-002"
-        self.completion_model = "gpt-3.5-turbo"
-        self.temperature = 0.0
-        self.top_k = 3
+        # 从环境变量获取配置
+        self.embedding_model = os.environ.get("EMBEDDING_MODEL", "text-embedding-ada-002")
+        self.completion_model = os.environ.get("COMPLETION_MODEL", "gpt-3.5-turbo")
+        self.temperature = float(os.environ.get("TEMPERATURE", "0.0"))
+        self.top_k = int(os.environ.get("TOP_K", "3"))
         
         # 初始化状态
         self.client = None
@@ -50,10 +53,6 @@ class RagAssistant:
         self.embeddings = None
         self.index = None
         self.is_ready = False
-        
-        # 加载配置
-        if config_file:
-            self.load_config()
         
         # 初始化OpenAI客户端
         self.init_openai()
@@ -76,32 +75,6 @@ class RagAssistant:
             self.index is not None
         )
         return self.is_ready
-    
-    def load_config(self):
-        """从配置文件加载设置"""
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                
-                # 更新API密钥（如果未通过参数提供）
-                if not self.api_key and "api_key" in config:
-                    self.api_key = config.get("api_key")
-                
-                # 更新模型配置
-                self.embedding_model = config.get("embedding_model", self.embedding_model)
-                self.completion_model = config.get("completion_model", self.completion_model)
-                self.temperature = config.get("temperature", self.temperature)
-                self.top_k = config.get("top_k", self.top_k)
-                
-                print(f"从 {self.config_file} 加载配置成功")
-                return True
-            else:
-                print(f"配置文件 {self.config_file} 不存在")
-                return False
-        except Exception as e:
-            print(f"加载配置时出错: {e}")
-            return False
     
     def init_openai(self):
         """初始化OpenAI客户端"""

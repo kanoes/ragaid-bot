@@ -9,6 +9,7 @@
 ```
 project/
 ├── main.py                 # 主程序（包含模拟运行逻辑）
+├── .env                    # 环境变量配置文件
 ├── modules/                # 模块化项目结构
 │   ├── robot/              # 机器人模块
 │   │   ├── __init__.py     
@@ -25,8 +26,6 @@ project/
 │   └── rag/                # RAG模块
 │       ├── __init__.py
 │       ├── rag_assistant.py      # RAG助手实现
-│       ├── config/               # 配置文件目录
-│       │   └── config.json       # RAG配置
 │       └── knowledge/            # 知识库目录
 │           └── knowledge.json    # 知识库文件
 └── README.md               # 项目说明文档
@@ -70,14 +69,14 @@ project/
 
 3. **配置选项**：
    - 可自定义API密钥、模型和参数
-   - 配置文件支持
+   - 环境变量文件(.env)支持
    - 错误处理和回退机制
 
 ## 安装依赖
 
 基本依赖：
 ```
-pip install matplotlib
+pip install matplotlib python-dotenv
 ```
 
 使用RAG机器人需要额外安装：
@@ -97,20 +96,37 @@ python main.py
 python main.py --api-key YOUR_OPENAI_API_KEY
 ```
 
-### 指定配置和知识库文件
+### 指定知识库文件
 ```
-python main.py --config path/to/config.json --knowledge path/to/knowledge.json
+python main.py --knowledge path/to/knowledge.json
 ```
 
 ## 创建自定义知识库
 
-1. 复制`modules/rag/knowledge/knowledge.json`到新文件
+1. 复制示例知识库到新文件
 2. 编辑该文件，添加您的知识条目。文件格式为JSON数组，每个元素是一个字符串，描述机器人应该了解的一条知识
 
 ## 配置RAG机器人
 
-1. 复制`modules/rag/config/config.json`到新文件
-2. 编辑该文件，设置您的OpenAI API密钥和其他参数
+项目使用.env文件存储配置。默认情况下，系统会自动创建包含以下配置的.env文件：
+
+```
+# OpenAI API配置
+OPENAI_API_KEY=your_api_key_here
+# 模型配置
+EMBEDDING_MODEL=text-embedding-ada-002
+COMPLETION_MODEL=gpt-3.5-turbo
+TEMPERATURE=0.3
+TOP_K=3
+```
+
+您可以编辑此文件来自定义配置：
+
+- `OPENAI_API_KEY`: 您的OpenAI API密钥
+- `EMBEDDING_MODEL`: 用于生成嵌入的模型名称
+- `COMPLETION_MODEL`: 用于生成决策的模型名称
+- `TEMPERATURE`: 模型输出的随机性（0-1）
+- `TOP_K`: 检索时返回的最相关知识条目数量
 
 ## 订单输入示例
 
@@ -124,6 +140,7 @@ python main.py --config path/to/config.json --knowledge path/to/knowledge.json
 
 - Python 3.6+
 - matplotlib
+- python-dotenv
 - threading
 - OpenAI API (用于智能机器人)
 - FAISS (用于智能机器人)
