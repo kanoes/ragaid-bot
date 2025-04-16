@@ -15,7 +15,6 @@
 
 ## 文件结构
 
-```
 餐厅送餐机器人模拟系统/
 ├── main.py                      # 主程序入口
 ├── create_restaurant_example.py # 餐厅布局创建示例
@@ -46,7 +45,6 @@
 └── test/                        # 测试脚本
     ├── test_load_restaurant.py  # 餐厅加载测试
     └── test_delivery_simulation.py # 送餐模拟测试
-```
 
 ## 如何使用
 
@@ -113,7 +111,3 @@ python create_restaurant_example.py
 - 添加真实AI服务连接
 - 实现更复杂的餐厅环境和障碍物
 - 优化路径规划算法
-
-## 贡献
-
-欢迎提交问题和改进建议！

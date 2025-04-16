@@ -1,15 +1,15 @@
-# modules/utils/path_planner.py
+# modules/robot/path_planning/path_planner.py
 import heapq
 
 class PathPlanner:
     """
-    A*アルゴリズムによる経路計画の実装
+    A*算法的路径规划实现
     """
     def __init__(self, environment):
         self.env = environment
 
     def heuristic(self, a, b):
-        # マンハッタン距離をヒューリスティック関数として使用
+        # 使用曼哈顿距离作为启发函数
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
     
     def find_path(self, start, goal):
@@ -19,23 +19,23 @@ class PathPlanner:
         came_from = {}
         g_score = {start: 0}
         
-        # 開始点と目標周辺の状況を表示
-        print(f"経路計画開始：{start} から {goal} へ")
+        # 显示起点和目标周围的情况
+        print(f"路径规划开始：从{start}到{goal}")
         
-        # 目標位置の周りに通行可能エリアがあるか確認
+        # 检查目标位置周围是否有可通行区域
         goal_x, goal_y = goal
         goal_neighbors = []
         for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
             nx, ny = goal_x + dx, goal_y + dy
             if 0 <= nx < env.height and 0 <= ny < env.width:
-                status = "通行可能" if env.is_free((nx, ny)) else "通行不可"
+                status = "可通行" if env.is_free((nx, ny)) else "不可通行"
                 goal_neighbors.append(f"({nx}, {ny}): {status}")
         
-        print(f"目標位置 {goal} の周囲状況:")
+        print(f"目标位置{goal}周围情况:")
         for n in goal_neighbors:
             print(f"  {n}")
         
-        # 目標が完全に封鎖されているかチェック - すべて通行不可の場合、探索範囲を拡大
+        # 检查目标是否完全被封锁 - 如果都不可通行，则扩大搜索范围
         all_blocked = True
         for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
             nx, ny = goal_x + dx, goal_y + dy
@@ -43,30 +43,30 @@ class PathPlanner:
                 all_blocked = False
                 break
                 
-        # 目標周辺がすべて封鎖されている場合、探索半径を増やして到達可能点を探す
+        # 如果目标周围都被封锁，增加搜索半径寻找可到达点
         if all_blocked:
-            print(f"警告：目標 {goal} の周囲がすべて封鎖されています。探索範囲を拡大します")
-            # 探索半径を2に拡大
+            print(f"警告：目标{goal}周围都被封锁。扩大搜索范围")
+            # 将搜索半径扩大到2
             for r in range(2, 4):  # 半径2-3
                 for dx in range(-r, r+1):
                     for dy in range(-r, r+1):
-                        if abs(dx) + abs(dy) <= r:  # マンハッタン距離がr以下
+                        if abs(dx) + abs(dy) <= r:  # 曼哈顿距离不超过r
                             nx, ny = goal_x + dx, goal_y + dy
                             if 0 <= nx < env.height and 0 <= ny < env.width and env.is_free((nx, ny)):
-                                print(f"目標から {r} ステップ離れた到達可能点 ({nx}, {ny}) を発見")
-                                # この点を一時的な目標として設定
+                                print(f"发现距离目标{r}步的可到达点({nx}, {ny})")
+                                # 将此点设为临时目标
                                 temp_goal = (nx, ny)
-                                # 標準A*を使用してこの一時的な目標への経路を検索
+                                # 使用标准A*搜索到临时目标的路径
                                 path = self._find_path_internal(start, temp_goal)
                                 if path:
-                                    print(f"一時的な目標 {temp_goal} への経路が見つかりました")
+                                    print(f"找到到临时目标{temp_goal}的路径")
                                     return path
         
-        # 標準A*探索
+        # 标准A*搜索
         return self._find_path_internal(start, goal)
         
     def _find_path_internal(self, start, goal):
-        """内部標準A*経路探索"""
+        """内部标准A*路径搜索"""
         env = self.env
         open_set = []
         heapq.heappush(open_set, (0, start))
@@ -77,7 +77,7 @@ class PathPlanner:
             current_priority, current = heapq.heappop(open_set)
             if current == goal:
                 path = self.reconstruct_path(came_from, current)
-                print(f"経路が見つかりました: {path}")
+                print(f"找到路径: {path}")
                 return path
 
             for neighbor in env.neighbors(current):
@@ -88,8 +88,8 @@ class PathPlanner:
                     f_score = tentative_g + self.heuristic(neighbor, goal)
                     heapq.heappush(open_set, (f_score, neighbor))
         
-        print(f"{start} から {goal} への経路が見つかりません")
-        return None  # 経路が見つからない
+        print(f"从{start}到{goal}找不到路径")
+        return None  # 找不到路径
 
     def reconstruct_path(self, came_from, current):
         path = [current]

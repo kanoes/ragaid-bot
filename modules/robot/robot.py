@@ -1,112 +1,112 @@
-from modules.robot.path_planning import PathPlanner
+from modules.robot.path_planner import PathPlanner
 import time
 
-# 条件付きでRAGアシスタントをインポート
+# 条件导入RAG助手
 try:
     from modules.rag.rag_assistant import RagAssistant
     RAG_AVAILABLE = True
 except ImportError:
     RAG_AVAILABLE = False
-    print("警告: RAGモジュールが利用できません。基本ロボット動作を使用します")
+    print("警告: RAG模块不可用，将使用基础机器人功能")
 
 class Robot:
     """
-    ロボット基本クラス、基本的な経路計画、移動、障害物処理機能を定義
-    enable_ragオプションでスマート意思決定機能を有効化可能
+    机器人基础类，定义基本路径规划、移动、障碍物处理功能
+    enable_rag选项可以启用智能决策功能
     """
     def __init__(self, environment, start=None, goal=None, robot_id=1, 
                 enable_rag=False, api_key=None, knowledge_file=None):
         """
-        ロボットを初期化
+        初始化机器人
         
-        パラメータ:
-            environment: 環境オブジェクト
-            start: 開始位置
-            goal: 目標位置
-            robot_id: ロボットID
-            enable_rag: RAG機能を有効にするかどうか
-            api_key: OpenAI APIキー（enable_rag=Trueの場合のみ使用）
-            knowledge_file: 知識ベースファイルパス（enable_rag=Trueの場合のみ使用）
+        参数:
+            environment: 环境对象
+            start: 起始位置
+            goal: 目标位置
+            robot_id: 机器人ID
+            enable_rag: 是否启用RAG功能
+            api_key: OpenAI API密钥（仅在enable_rag=True时使用）
+            knowledge_file: 知识库文件路径（仅在enable_rag=True时使用）
         """
         self.env = environment
-        self.robot_id = robot_id  # ロボットID
+        self.robot_id = robot_id  # 机器人ID
         
-        # ロボット名を設定
+        # 设置机器人名称
         self.enable_rag = enable_rag and RAG_AVAILABLE
-        self.name = "スマートロボット" if self.enable_rag else "基本ロボット"
+        self.name = "智能机器人" if self.enable_rag else "基础机器人"
         
-        # すべてのキッチン位置を取得
+        # 获取所有厨房位置
         kitchen_positions = environment.get_kitchen_positions()
         
-        # 開始点が提供されていない場合、環境内の最初のキッチン位置をデフォルトとする
+        # 如果没有提供起始点，默认使用环境中的第一个厨房位置
         if start is None:
             if kitchen_positions:
                 self.start = kitchen_positions[0]
             else:
-                self.start = (0, 0)  # デフォルトの開始点
+                self.start = (0, 0)  # 默认起始点
         else:
             self.start = start
             
-        self.goal = goal  # 目標位置はNoneでもよい、後で注文から設定
-        self.position = self.start  # 現在位置は最初は開始点
+        self.goal = goal  # 目标位置可以为None，后续从订单中设置
+        self.position = self.start  # 当前位置初始为起始点
         self.planner = PathPlanner(environment)
-        self.path = []  # 現在計画された経路
-        self.path_history = [self.start]  # 可視化のために各ステップの座標を記録
+        self.path = []  # 当前规划的路径
+        self.path_history = [self.start]  # 记录每一步的坐标以便可视化
         
-        # 注文関連の属性
-        self.current_order = None  # 現在配送中の注文
-        self.delivered_orders = []  # 配送済み注文リスト
-        self.failed_orders = []    # 配送失敗注文リスト
-        self.idle = True           # ロボットがアイドル状態かどうか
-        self.kitchen_position = self.start  # キッチン位置（デフォルトは開始点）
+        # 订单相关属性
+        self.current_order = None  # 当前配送中的订单
+        self.delivered_orders = []  # 已配送订单列表
+        self.failed_orders = []    # 配送失败订单列表
+        self.idle = True           # 机器人是否空闲
+        self.kitchen_position = self.start  # 厨房位置（默认为起始点）
         
-        # RAGアシスタントの初期化（有効な場合）
+        # 初始化RAG助手（如果启用）
         self.rag_assistant = None
         if self.enable_rag:
-            print(f"\n===== {self.name} #{robot_id} のRAG機能を初期化 =====")
+            print(f"\n===== 初始化{self.name} #{robot_id}的RAG功能 =====")
             try:
                 self.rag_assistant = RagAssistant(
                     api_key=api_key,
                     knowledge_file=knowledge_file
                 )
-                print(f"RAG機能{('準備完了' if self.rag_assistant.is_ready else '初期化失敗')}")
+                print(f"RAG功能{'准备就绪' if self.rag_assistant.is_ready else '初始化失败'}")
             except Exception as e:
-                print(f"RAGアシスタント初期化エラー: {e}")
+                print(f"RAG助手初始化错误: {e}")
                 self.enable_rag = False
-                self.name = "基本ロボット"  # 基本ロボットにダウングレード
+                self.name = "基础机器人"  # 降级为基础机器人
             print("========================================\n")
         
-        # 初期化情報を表示
-        print(f"{self.name}#{self.robot_id} - 位置 {self.start} で初期化、初期キッチン位置 {self.kitchen_position}")
-        print(f"環境内に {len(kitchen_positions)} 個のキッチン位置があります: {kitchen_positions}")
+        # 显示初始化信息
+        print(f"{self.name}#{self.robot_id} - 在位置{self.start}初始化，初始厨房位置{self.kitchen_position}")
+        print(f"环境中有{len(kitchen_positions)}个厨房位置: {kitchen_positions}")
 
     def plan_path(self):
-        """現在位置から目標位置への経路を計画"""
+        """规划从当前位置到目标位置的路径"""
         if self.goal is None:
-            print("目標位置が設定されていません")
+            print("未设置目标位置")
             return None
             
         self.path = self.planner.find_path(self.position, self.goal)
         if self.path:
-            print(f"{self.name}#{self.robot_id} - {self.position} から {self.goal} への計画経路： {self.path}")
+            print(f"{self.name}#{self.robot_id} - 从{self.position}到{self.goal}的规划路径：{self.path}")
         else:
-            print(f"{self.name}#{self.robot_id} - 経路が見つかりません！")
+            print(f"{self.name}#{self.robot_id} - 未找到路径！")
         return self.path
     
     def is_adjacent_to_table(self, table_position):
-        """現在位置がテーブルに隣接しているかをチェック"""
+        """检查当前位置是否与桌子相邻"""
         if not table_position:
             return False
             
         table_x, table_y = table_position
         x, y = self.position
         
-        # テーブルの上下左右4方向にいるかをチェック
+        # 检查是否在桌子的上下左右四个方向
         return (abs(x - table_x) == 1 and y == table_y) or (abs(y - table_y) == 1 and x == table_x)
     
     def move(self):
         """
-        経路に沿って1ステップ前進
+        沿路径前进一步
         """
         if self.path and len(self.path) > 1:
             next_position = self.path[1]
@@ -115,52 +115,52 @@ class Robot:
                 self.path_history.append(next_position)
                 self.path.pop(0)
                 
-                # 配送目標の近くに到達したかどうかをチェック
+                # 检查是否接近配送目标
                 if self.current_order:
                     table_position = self.env.get_table_position(self.current_order.table_id)
                     if self.is_adjacent_to_table(table_position):
-                        print(f"{self.name}#{self.robot_id} - テーブル番号 {self.current_order.table_id} の近くに到着、配送準備中")
-                        # 目標がテーブルの隣で、到達している場合は配送成功とみなす
+                        print(f"{self.name}#{self.robot_id} - 已接近桌号{self.current_order.table_id}，准备配送")
+                        # 如果目标是桌子旁边并且已到达，则认为配送成功
                         if self.position == self.goal:
                             self.on_goal_reached()
             else:
-                print(f"{self.name}#{self.robot_id} - {next_position} で障害物に遭遇。")
+                print(f"{self.name}#{self.robot_id} - 在{next_position}遇到障碍物。")
                 self.handle_obstacle(next_position)
         else:
             if self.path and len(self.path) == 1 and self.position == self.goal:
-                print(f"{self.name}#{self.robot_id} - 目標位置 {self.goal} に到着")
+                print(f"{self.name}#{self.robot_id} - 已到达目标位置{self.goal}")
                 self.on_goal_reached()
             else:
-                print(f"{self.name}#{self.robot_id} - 利用可能な経路がありません。")
+                print(f"{self.name}#{self.robot_id} - 没有可用路径。")
     
     def handle_obstacle(self, obstacle_position):
         """
-        障害物に遭遇した際の処理ロジック
-        RAGが有効な場合はスマート意思決定を使用、そうでなければ基本動作を使用
+        处理遇到障碍物的逻辑
+        如果启用了RAG则使用智能决策，否则使用基础行为
         """
         if self.enable_rag and self.rag_assistant and self.rag_assistant.is_ready:
             return self._handle_obstacle_with_rag(obstacle_position)
         else:
-            # 基本ロボットの動作
-            print(f"{self.name}#{self.robot_id} - {obstacle_position} で障害物に遭遇、配送停止")
+            # 基础机器人行为
+            print(f"{self.name}#{self.robot_id} - 在{obstacle_position}遇到障碍物，停止配送")
             if self.current_order:
-                self.fail_current_order("障害物に遭遇し、配送を続行できません")
+                self.fail_current_order("遇到障碍物，无法继续配送")
             
-            # キッチンへの帰還を試みる
+            # 尝试返回厨房
             self.return_to_kitchen()
     
     def _handle_obstacle_with_rag(self, obstacle_position):
-        """RAG技術を使用して障害物を処理"""
-        print(f"\n===== {self.name}#{self.robot_id} - RAGを使用して障害物を処理 =====")
-        print(f"障害物の位置: {obstacle_position}")
+        """使用RAG技术处理障碍物"""
+        print(f"\n===== {self.name}#{self.robot_id} - 使用RAG处理障碍物 =====")
+        print(f"障碍物位置: {obstacle_position}")
         
-        # その位置が実際に障害物かどうかを確認
+        # 确认该位置是否确实是障碍物
         x, y = obstacle_position
         if 0 <= x < self.env.height and 0 <= y < self.env.width:
             grid_value = self.env.grid[x][y]
-            print(f"その位置のグリッド値: {grid_value} (0=空きスペース, 1=障害物, 2=テーブル, 3=キッチン)")
+            print(f"该位置的网格值: {grid_value} (0=空闲空间, 1=障碍物, 2=桌子, 3=厨房)")
         
-        # RAGアシスタントで意思決定
+        # 使用RAG助手进行决策
         decision = self.rag_assistant.make_decision(
             situation_type="obstacle", 
             robot_id=self.robot_id,
@@ -169,390 +169,390 @@ class Robot:
             context=obstacle_position
         )
         
-        print(f"{self.name}#{self.robot_id} - RAG決定：{decision}")
+        print(f"{self.name}#{self.robot_id} - RAG决策：{decision}")
         
-        # 決定に基づいて行動を選択
-        if decision == "迂回" or decision == "再計画" or decision == "新しい経路を探索":
-            print(f"決定: {decision} - 代替経路を探します")
-            # 現在の障害物を回避する経路を探す
+        # 根据决策选择行动
+        if decision == "绕行" or decision == "重新规划" or decision == "寻找新路径":
+            print(f"决策: {decision} - 寻找替代路径")
+            # 寻找绕过当前障碍物的路径
             self.find_alternative_path(obstacle_position)
-        elif decision == "待機" or decision == "しばらく待ってから再試行":
-            print(f"決定: {decision} - 待機してから再試行")
-            # 待機をシミュレート
-            print(f"{self.name}#{self.robot_id} - しばらく待ってから再試行...")
-            time.sleep(0.5)  # 0.5秒の待機をシミュレート
-            # 同じ移動を即座に再試行しないように最初のポイントを削除
+        elif decision == "等待" or decision == "稍等后重试":
+            print(f"决策: {decision} - 等待后重试")
+            # 模拟等待
+            print(f"{self.name}#{self.robot_id} - 稍等后重试...")
+            time.sleep(0.5)  # 模拟0.5秒等待
+            # 删除第一个点以避免立即重试相同的移动
             if len(self.path) > 1:
                 self.path.pop(0)
-        elif decision == "到達不能を報告":
-            print(f"決定: {decision} - 現在のタスクを放棄")
-            print(f"{self.name}#{self.robot_id} - 経路が完全に遮断されており、目標に到達できません")
+        elif decision == "报告无法到达":
+            print(f"决策: {decision} - 放弃当前任务")
+            print(f"{self.name}#{self.robot_id} - 路径完全被阻断，无法到达目标")
             if self.current_order:
-                self.fail_current_order("経路が遮断されており、目標テーブルに到達できません")
+                self.fail_current_order("路径被阻断，无法到达目标桌子")
             else:
-                # 現在の注文がない場合はキッチンへの帰還を試みる
+                # 如果没有当前订单，尝试返回厨房
                 self.return_to_kitchen()
         
-        print(f"===== 障害物処理完了 =====\n")
+        print(f"===== 障碍物处理完成 =====\n")
     
     def find_alternative_path(self, obstacle_position):
         """
-        障害物を回避する代替経路を探す
+        寻找绕过障碍物的替代路径
         """
-        # 現在の経路が遮断されているため、代替経路を探す必要がある
+        # 移除障碍物位置
+        if obstacle_position in self.path:
+            self.path.remove(obstacle_position)
         
-        # 戦略1: 再計画を試みる
-        print(f"{self.name}#{self.robot_id} - 再計画を試みる...")
+        # 重新规划路径
         new_path = self.planner.find_path(self.position, self.goal)
-        
         if new_path:
+            print(f"{self.name}#{self.robot_id} - 找到新路径: {new_path}")
             self.path = new_path
-            print(f"{self.name}#{self.robot_id} - 新しい経路を見つけました: {self.path}")
-            return True
-        
-        # 戦略2: 直接再計画が失敗した場合は、周囲のいくつかの方向に移動してから再計画
-        print(f"{self.name}#{self.robot_id} - 直接経路計画が失敗したため、周囲の領域を探索...")
-        
-        # 現在の位置のすべての隣接位置を取得
-        neighbors = self.env.neighbors(self.position)
-        
-        # 目標からの距離に基づいて隣接位置をソート
-        neighbors.sort(key=lambda pos: self.planner.heuristic(pos, self.goal))
-        
-        # 各隣接位置から目標への経路を計画してみる
-        for next_pos in neighbors:
-            if next_pos == obstacle_position:
-                continue  # 障害物位置をスキップ
-            
-            temp_path = self.planner.find_path(next_pos, self.goal)
-            if temp_path:
-                # 隣接位置から目標への経路を見つけた場合は、まずその隣接位置に移動
-                self.path = [self.position, next_pos] + temp_path[1:]
-                print(f"{self.name}#{self.robot_id} - 迂回経路を見つけました、{next_pos}を経由")
-                return True
-        
-        print(f"{self.name}#{self.robot_id} - 有効な代替経路が見つかりません")
-        return False
+        else:
+            print(f"{self.name}#{self.robot_id} - 找不到替代路径，尝试返回厨房")
+            if self.current_order:
+                self.fail_current_order("无法找到到达目标的替代路径")
+            self.return_to_kitchen()
     
     def assign_order(self, order):
         """
-        注文をロボットに割り当てる
-        """
-        if not self.idle:
-            print(f"{self.name}#{self.robot_id} - 現在忙しいため、新しい注文を受け付けられません")
-            return False
+        分配订单给机器人
+        
+        参数:
+            order: 要配送的订单对象
             
+        返回:
+            bool: 分配是否成功
+        """
+        # 检查机器人是否空闲
+        if not self.idle:
+            print(f"{self.name}#{self.robot_id} - 当前正忙，无法接受新订单")
+            return False
+        
+        # 保存当前订单
         self.current_order = order
         self.idle = False
-            
-        # 目標位置を注文に対応するテーブル位置に設定
+        
+        # 设置配送目标（桌子位置）
         table_position = self.env.get_table_position(order.table_id)
-        if table_position:
-            # テーブル周囲の通行可能な位置を目標にする
-            # (テーブル自体は通行不可なので、テーブルの隣の位置を探す)
-            table_x, table_y = table_position
-            adjacent_positions = [
-                (table_x-1, table_y), (table_x+1, table_y),
-                (table_x, table_y-1), (table_x, table_y+1)
-            ]
-            
-            # 通行可能な位置をフィルタリング
-            valid_positions = [pos for pos in adjacent_positions if self.env.is_free(pos)]
-            
-            if valid_positions:
-                # 最初の利用可能な位置を目標に選択
-                self.goal = valid_positions[0]
-                print(f"{self.name}#{self.robot_id} - 注文 #{order.order_id} を受け入れました、テーブル番号: {order.table_id}")
-                print(f"テーブル位置: {table_position}, 配送目標位置: {self.goal}")
-                return self.plan_path()
-            else:
-                print(f"{self.name}#{self.robot_id} - テーブル番号 {order.table_id} 周囲の通行可能な位置が見つかりません")
-                self.current_order = None
-                self.idle = True
-                return False
-        else:
-            print(f"{self.name}#{self.robot_id} - テーブル番号 {order.table_id} の位置が見つかりません")
-            self.current_order = None
-            self.idle = True
+        if not table_position:
+            print(f"{self.name}#{self.robot_id} - 错误: 找不到桌号 {order.table_id} 的位置")
+            self.fail_current_order("找不到目标桌子位置")
             return False
+        
+        # 确定目标位置（通常是桌子附近的位置）
+        # 这里我们选择桌子旁边的空闲位置作为目标
+        table_x, table_y = table_position
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:  # 四个方向
+            potential_goal = (table_x + dx, table_y + dy)
+            if self.env.is_free(potential_goal):
+                self.goal = potential_goal
+                break
+        else:
+            # 如果没有找到空闲位置，报告错误
+            print(f"{self.name}#{self.robot_id} - 错误: 桌号 {order.table_id} 周围没有可到达的位置")
+            self.fail_current_order("目标桌子周围没有可到达的位置")
+            return False
+        
+        # 规划路径并开始配送
+        print(f"{self.name}#{self.robot_id} - 接受订单 #{order.order_id} 配送到桌号 {order.table_id}")
+        print(f"目标桌子位置: {table_position}, 配送目标位置: {self.goal}")
+        path = self.plan_path()
+        if not path:
+            print(f"{self.name}#{self.robot_id} - 无法规划到目标桌子的路径，取消订单")
+            self.fail_current_order("无法规划到目标桌子的路径")
+            return False
+        
+        # 开始配送
+        order.start_delivery()
+        return True
     
     def on_goal_reached(self):
-        """目標位置に到着した際のコールバック"""
+        """
+        到达目标时的处理
+        """
         if self.current_order:
-            # 目標に近いテーブルかどうかをチェック
-            table_position = self.env.get_table_position(self.current_order.table_id)
-            is_near_table = self.is_adjacent_to_table(table_position)
-            
-            print(f"{self.name}#{self.robot_id} - 目標位置 {self.position} に到着")
-            
-            if is_near_table:
-                print(f"{self.name}#{self.robot_id} - 注文 #{self.current_order.order_id} をテーブル番号 {self.current_order.table_id} に成功配送")
-                # 配送済み注文リストに追加
-                self.delivered_orders.append(self.current_order)
+            print(f"{self.name}#{self.robot_id} - 已到达桌号 {self.current_order.table_id}，完成配送")
+            # 标记订单为已配送
+            self.current_order.complete_delivery()
+            # 将订单添加到已配送列表
+            self.delivered_orders.append(self.current_order)
+            # 添加统计数据
+            elapsed = self.current_order.get_delivery_time()
+            if elapsed:
+                print(f"配送用时: {elapsed:.2f}秒")
+                # 更新机器人的统计信息
+                self.stats["total_time"] += elapsed
+                self.stats["total_distance"] += len(self.path_history)
+                self.stats["successful_deliveries"] += 1
                 
-                # 完了注文としてマークしますが、現在の注文をクリアしない
-                # これにより、main.pyのチェックは注文が配送されたことをキャプチャできます
-                # 完了フラグを設定して注文が完了したことを示す
-                self.current_order.delivered_flag = True
-                
-                # キッチンへの帰還
-                self.return_to_kitchen()
-            else:
-                print(f"{self.name}#{self.robot_id} - 警告：目標位置に到着しましたが、テーブル番号 {self.current_order.table_id} 近くにありません")
-                self.fail_current_order("配送位置が正しくありません")
-        else:
-            # キッチンに戻る
-            kitchen_positions = self.env.get_kitchen_positions()
-            if self.position in kitchen_positions:
-                print(f"{self.name}#{self.robot_id} - キッチンに戻りました")
-                # 配送済み注文がある場合は、ここで安全にクリアできます
-                if hasattr(self, 'current_order') and self.current_order and hasattr(self.current_order, 'delivered_flag'):
-                    self.current_order = None
-                self.idle = True
+            # 清除当前订单和目标
+            self.current_order = None
+            self.goal = None
+        
+        # 返回厨房
+        self.return_to_kitchen()
     
-    def fail_current_order(self, reason="不明な理由"):
-        """現在の注文を失敗としてマーク"""
+    def fail_current_order(self, reason="未知原因"):
+        """标记当前订单配送失败"""
         if self.current_order:
-            print(f"{self.name}#{self.robot_id} - 注文 #{self.current_order.order_id} 配送失敗: {reason}")
+            print(f"{self.name}#{self.robot_id} - 订单 #{self.current_order.order_id} 配送失败: {reason}")
+            self.current_order.fail_delivery()
             self.failed_orders.append(self.current_order)
             self.current_order = None
-            
-            # キッチンへの帰還
-            self.return_to_kitchen()
+            self.stats["failed_deliveries"] += 1
     
     def return_to_kitchen(self):
-        """キッチン位置に戻る"""
-        # すべてのキッチン位置を取得
-        kitchen_positions = self.env.get_kitchen_positions()
-        if not kitchen_positions:
-            print(f"{self.name}#{self.robot_id} - エラー：キッチン位置がありません")
+        """返回厨房位置"""
+        # 清除当前目标和路径
+        self.goal = self.kitchen_position
+        self.path = []
+        
+        print(f"{self.name}#{self.robot_id} - 返回厨房位置 {self.kitchen_position}")
+        
+        # 规划返回厨房的路径
+        path = self.planner.find_path(self.position, self.kitchen_position)
+        if path:
+            self.path = path
+            print(f"{self.name}#{self.robot_id} - 规划返回厨房的路径: {path}")
+            
+            # 模拟返回厨房
+            steps = 0
+            max_steps = 100  # 防止无限循环
+            
+            while self.path and steps < max_steps:
+                self.move()
+                steps += 1
+                if self.position == self.kitchen_position:
+                    print(f"{self.name}#{self.robot_id} - 已返回厨房")
+                    break
+            
+            if steps >= max_steps:
+                print(f"{self.name}#{self.robot_id} - 警告: 返回厨房所需步数超过最大限制")
+            
+            # 重置闲置状态
             self.idle = True
-            return False
-            
-        # すべてのキッチン位置に向かって経路計画を試み、最も近いものを選択
-        successful_path = None
-        chosen_kitchen = None
-        
-        print(f"{self.name}#{self.robot_id} - キッチンに戻るために試みます、現在のキッチン位置が {len(kitchen_positions)} 個あります")
-        
-        for kitchen_pos in kitchen_positions:
-            self.goal = kitchen_pos
-            print(f"{self.name}#{self.robot_id} - キッチン位置 {kitchen_pos} に向かって経路計画を試みます")
-            path = self.planner.find_path(self.position, kitchen_pos)
-            
-            if path:
-                # 有効な経路を見つけた場合は、このキッチン位置を使用
-                successful_path = path
-                chosen_kitchen = kitchen_pos
-                print(f"{self.name}#{self.robot_id} - キッチンに戻る {kitchen_pos} の経路を成功見つけました")
-                break
-        
-        if successful_path:
-            self.path = successful_path
-            self.goal = chosen_kitchen
-            self.kitchen_position = chosen_kitchen  # 現在のキッチン位置を更新
-            print(f"{self.name}#{self.robot_id} - キッチンに戻る {chosen_kitchen} を開始")
-            self.idle = False  # 戻る途中はアイドル状態ではありません
-            return True
         else:
-            # 戻るために戻ることができない
-            print(f"{self.name}#{self.robot_id} - 戻るために戻ることができない")
-            # 配送済み注文がある場合でもキッチンに戻れない場合は、現在の注文をクリア
-            if hasattr(self, 'current_order') and self.current_order and hasattr(self.current_order, 'delivered_flag'):
-                print(f"{self.name}#{self.robot_id} - 注文が配送されましたが、キッチンに戻れません")
-                self.current_order = None
-            self.idle = True  # アイドル状態に設定し、新しいコマンドを待つ
-            return False
+            print(f"{self.name}#{self.robot_id} - 无法规划返回厨房的路径，不移动")
+            # 强制返回厨房
+            self.position = self.kitchen_position
+            self.path_history.append(self.position)
+            self.idle = True
+            print(f"{self.name}#{self.robot_id} - 已重置到厨房位置")
     
     def is_idle(self):
-        """ロボットがアイドル状態かどうかをチェック"""
-        kitchen_positions = self.env.get_kitchen_positions()
-        
-        # 現在の注文がなく、キッチン位置にある場合はアイドル状態とみなす
-        if self.current_order is None and self.position in kitchen_positions:
-            self.idle = True
-            return True
-        
-        # 経路がない場合はアイドル状態とみなす
-        if not self.path:
-            # キッチンに戻る途中にキッチンに到着した場合はアイドル状態とみなす
-            if self.position in kitchen_positions:
-                self.idle = True
-                return True
-                
+        """检查机器人是否空闲"""
         return self.idle
+    
+    @property
+    def stats(self):
+        """获取机器人的统计信息"""
+        if not hasattr(self, "_stats"):
+            self._stats = {
+                "successful_deliveries": 0,
+                "failed_deliveries": 0,
+                "total_distance": 0,
+                "total_time": 0
+            }
+        return self._stats
     
     def simulate(self, max_steps=50):
         """
-        ロボットのタスクをシミュレートし、目標に到着するか、ステップ数の制限を超えるまで実行
-        """
-        if not self.goal:
-            print(f"{self.name}#{self.robot_id} - 目標位置が設定されていません、シミュレーションを開始できません")
-            return False
-            
-        self.plan_path()
-        steps = 0
+        模拟机器人移动
         
-        while self.position != self.goal and self.path is not None:
-            print(f"ステップ {steps}：{self.name}#{self.robot_id} - 現在位置 {self.position}")
-            self.env.display(self.path, self.position)
+        参数:
+            max_steps: 最大模拟步数
+        """
+        steps = 0
+        while self.path and steps < max_steps:
+            print(f"\n步骤 {steps+1}: 当前位置 {self.position}")
             self.move()
             steps += 1
             
-            if steps > max_steps:
-                print(f"{self.name}#{self.robot_id} - シミュレーション終了：ステップ数が多すぎます。")
-                if self.current_order:
-                    self.fail_current_order("シミュレーションステップ数超過")
+            # 如果到达目标或者无路可走，结束模拟
+            if (self.position == self.goal) or (not self.path):
                 break
-                
-        if self.position == self.goal:
-            print(f"{self.name}#{self.robot_id} - タスク完了、{steps} ステップ後に目標 {self.position} に到着しました。")
-            self.on_goal_reached()
-            return True
-        return False
+        
+        print(f"\n模拟结束，共执行 {steps} 步")
+        print(f"最终位置: {self.position}")
+        print(f"路径历史: {self.path_history}")
+        
+        return steps, self.path_history
     
-    def get_statistics(self):
-        """ロボットの配送統計情報を取得"""
-        delivered_count = len(self.delivered_orders)
-        failed_count = len(self.failed_orders)
-        total_count = delivered_count + failed_count
+    def display_stats(self):
+        """显示机器人的统计信息"""
+        print(f"\n===== {self.name} #{self.robot_id} 统计信息 =====")
+        print(f"成功配送数: {self.stats['successful_deliveries']}")
+        print(f"失败配送数: {self.stats['failed_deliveries']}")
         
-        success_rate = (delivered_count / total_count * 100) if total_count > 0 else 0
+        total_deliveries = self.stats['successful_deliveries'] + self.stats['failed_deliveries']
+        if total_deliveries > 0:
+            success_rate = self.stats['successful_deliveries'] / total_deliveries * 100
+            print(f"配送成功率: {success_rate:.2f}%")
         
-        avg_delivery_time = 0
-        if delivered_count > 0:
-            total_delivery_time = sum(order.get_delivery_time() or 0 for order in self.delivered_orders)
-            avg_delivery_time = total_delivery_time / delivered_count
-        
-        return {
-            "robot_id": self.robot_id,
-            "delivered_orders": delivered_count,
-            "failed_orders": failed_count,
-            "total_orders": total_count,
-            "success_rate": success_rate,
-            "avg_delivery_time": avg_delivery_time
-        }
+        if self.stats['successful_deliveries'] > 0:
+            avg_distance = self.stats['total_distance'] / self.stats['successful_deliveries']
+            avg_time = self.stats['total_time'] / self.stats['successful_deliveries']
+            print(f"平均路径长度: {avg_distance:.2f}")
+            print(f"平均配送时间: {avg_time:.2f}秒")
     
     def comprehensive_test(self):
-        """
-        総合テストRAG機能の方法、RAGロボットのみで有効
-        """
-        if not self.enable_rag or not self.rag_assistant or not self.rag_assistant.is_ready:
-            print(f"{self.name}#{self.robot_id} - RAG機能が有効になっていません、総合テストを実行できません")
+        """执行全面测试，评估机器人性能"""
+        print(f"\n===== {self.name} #{self.robot_id} 全面测试 =====")
+        
+        # 重置统计信息
+        self._stats = {
+            "successful_deliveries": 0,
+            "failed_deliveries": 0,
+            "total_distance": 0,
+            "total_time": 0
+        }
+        
+        # 获取环境中的所有桌子
+        all_tables = list(self.env.tables.keys())
+        if not all_tables:
+            print("环境中没有桌子，无法进行测试")
             return
-            
-        print(f"\n===== {self.name}#{self.robot_id} - 総合テストを開始 =====")
         
-        # 異なる状況下での障害物処理をテスト
-        test_positions = [
-            (self.position[0] + 1, self.position[1]),  # 前方
-            (self.position[0], self.position[1] + 1),  # 右側
-            (self.position[0] - 1, self.position[1]),  # 後方
-            (self.position[0], self.position[1] - 1),  # 左側
-        ]
+        from modules.order import Order
+        import random
         
-        for pos in test_positions:
-            print(f"\n障害物位置テスト: {pos}")
-            # 環境境界外の位置をスキップ
-            if not (0 <= pos[0] < self.env.height and 0 <= pos[1] < self.env.width):
-                print(f"位置 {pos} が環境境界外で、テストをスキップ")
-                continue
-                
-            # 元のグリッド値を保存
-            original_value = self.env.grid[pos[0]][pos[1]]
-            
-            # その位置を一時的に障害物に設定（障害物でない場合）
-            if original_value == 0:  # 空地の場合
-                self.env.grid[pos[0]][pos[1]] = 1  # 障害物に設定
-                
-                # 障害物処理をテスト
-                print(f"シミュレートして {pos} で障害物に遭遇")
-                self._handle_obstacle_with_rag(pos)
-                
-                # 元のグリッド値を復元
-                self.env.grid[pos[0]][pos[1]] = original_value
+        # 创建测试订单
+        test_orders = []
+        for i in range(5):  # 测试5个订单
+            table_id = random.choice(all_tables)
+            order = Order(i+1, table_id, 0)  # 准备时间设为0
+            test_orders.append(order)
+        
+        # 执行测试
+        for order in test_orders:
+            print(f"\n处理测试订单 #{order.order_id} 到桌号 {order.table_id}")
+            success = self.assign_order(order)
+            if success:
+                # 模拟配送过程
+                steps, _ = self.simulate(max_steps=100)
+                print(f"订单处理完成，用了 {steps} 步")
             else:
-                print(f"位置 {pos} 現在値が {original_value}、空地ではないため、テストをスキップ")
+                print(f"订单分配失败")
         
-        print(f"\n===== 総合テスト完了 =====\n")
+        # 显示最终统计
+        self.display_stats()
+        
+        return self.stats
+
+    def take_order(self, order):
+        """
+        处理订单，兼容main.py中的调用
+        
+        参数:
+            order: 字典格式的订单 {'table_id': xxx, 'items': xxx, ...}
+            
+        返回:
+            bool: 订单处理是否成功
+        """
+        from modules.order import Order
+        
+        # 将字典格式转换为Order对象
+        if isinstance(order, dict):
+            table_id = order.get('table_id')
+            items = order.get('items', 1)
+            order_obj = Order(order_id=self.stats['successful_deliveries'] + self.stats['failed_deliveries'] + 1,
+                            table_id=table_id,
+                            prep_time=0,
+                            items=[f"物品{i+1}" for i in range(items)])
+        else:
+            # 如果已经是Order对象，直接使用
+            order_obj = order
+            
+        # 分配订单
+        return self.assign_order(order_obj)
 
 class AIEnhancedRobot(Robot):
     """
-    RAG技術で強化されたスマートロボット
-    基本ロボットの全機能に加え、より高度な意思決定能力を持ちます
+    AI增强型机器人，继承自基础机器人类，但默认启用RAG功能
     """
     def __init__(self, environment, start=None, goal=None, robot_id=1, api_key=None, knowledge_file=None):
-        """AIロボットを初期化"""
+        """
+        初始化AI增强型机器人
+        
+        所有参数与Robot类相同，但默认启用RAG功能
+        """
+        # 调用父类构造函数，强制启用RAG
         super().__init__(
-            environment=environment, 
-            start=start, 
+            environment=environment,
+            start=start,
             goal=goal, 
             robot_id=robot_id,
-            enable_rag=True,  # RAG機能を有効化
-            api_key=api_key, 
+            enable_rag=True,  # 总是启用RAG
+            api_key=api_key,
             knowledge_file=knowledge_file
         )
         
-        # 名前をより明確に
-        self.name = "RAG強化ロボット"
-        print(f"{self.name}#{self.robot_id} - 初期化完了、スマート意思決定有効")
+        # 如果RAG不可用，发出警告
+        if not self.enable_rag:
+            print(f"警告: RAG功能不可用，AI增强型机器人将以基础模式运行")
     
     def handle_obstacle(self, obstacle_position):
-        """
-        障害物を処理する強化版メソッド
-        常にRAGアシスタントを使用し、失敗時のみ基本戦略にフォールバック
-        """
-        # RAGアシスタントが利用可能な場合は使用
+        """重写障碍物处理方法以优先使用AI决策"""
+        # 始终尝试使用智能决策，但如果不可用则回退到基础行为
         if self.rag_assistant and self.rag_assistant.is_ready:
             return self._handle_obstacle_with_rag(obstacle_position)
         else:
-            # 基本戦略にフォールバック
-            print(f"{self.name}#{self.robot_id} - RAGアシスタントが利用できません。基本戦略にフォールバック。")
+            print(f"{self.name}#{self.robot_id} - RAG不可用，使用基础障碍物处理")
+            # 调用父类方法
             return super().handle_obstacle(obstacle_position)
     
     def find_alternative_path(self, obstacle_position):
-        """
-        障害物を回避する代替経路を探す強化版メソッド
-        より広範囲に経路を探索
-        """
-        print(f"{self.name}#{self.robot_id} - 高度な経路探索アルゴリズムを使用")
+        """增强版的替代路径寻找算法"""
+        # 使用更复杂的逻辑寻找替代路径
+        print(f"{self.name}#{self.robot_id} - 使用增强型寻路算法...")
         
-        # 現在の経路を保存
-        original_path = self.path.copy() if self.path else []
+        # 移除障碍物位置
+        if obstacle_position in self.path:
+            self.path.remove(obstacle_position)
         
-        # 障害物周辺を迂回する経路を広範囲に探索
-        # 現在位置から目標までの直接経路を再計画
-        new_path = self.planner.find_path(self.position, self.goal)
+        # 优先尝试几种不同的绕行策略
+        strategies = [
+            "直接重规划",  # 直接重新规划路径
+            "后退一步",    # 后退一步再规划
+            "扩大搜索范围"  # 扩大搜索范围寻找路径
+        ]
         
-        if new_path:
-            print(f"{self.name}#{self.robot_id} - 新しい経路を見つけました: {len(new_path)} ステップ")
-            self.path = new_path
-            return True
-        else:
-            print(f"{self.name}#{self.robot_id} - 現在位置から直接到達できる経路が見つかりません")
+        for strategy in strategies:
+            print(f"尝试策略: {strategy}")
             
-            # キッチンへの復帰経路を計画
-            if self.kitchen_position:
-                print(f"{self.name}#{self.robot_id} - キッチンへの帰還経路を検討")
-                kitchen_path = self.planner.find_path(self.position, self.kitchen_position)
-                if kitchen_path:
-                    # 戦略的撤退 - いったんキッチンに戻ってから再計画
-                    print(f"{self.name}#{self.robot_id} - 一時的にキッチンに戻ります")
-                    self.path = kitchen_path
+            if strategy == "直接重规划":
+                new_path = self.planner.find_path(self.position, self.goal)
+                if new_path:
+                    print(f"直接重规划成功")
+                    self.path = new_path
                     return True
+                    
+            elif strategy == "后退一步":
+                # 如果路径历史中有至少两个点，尝试后退一步
+                if len(self.path_history) >= 2:
+                    prev_position = self.path_history[-2]
+                    if self.env.is_free(prev_position):
+                        print(f"后退到位置 {prev_position}")
+                        self.position = prev_position
+                        self.path_history.append(prev_position)
+                        new_path = self.planner.find_path(self.position, self.goal)
+                        if new_path:
+                            print(f"后退后重规划成功")
+                            self.path = new_path
+                            return True
             
-            # 元の経路に戻す（現在位置以前は削除）
-            if original_path:
-                current_index = -1
-                for i, pos in enumerate(original_path):
-                    if pos == self.position:
-                        current_index = i
-                        break
-                
-                if current_index >= 0 and current_index < len(original_path) - 1:
-                    print(f"{self.name}#{self.robot_id} - 元の経路に戻って別のアプローチを試みます")
-                    self.path = original_path[current_index:]
+            elif strategy == "扩大搜索范围":
+                # 这个策略在PathPlanner中已实现，这里只需直接调用
+                new_path = self.planner.find_path(self.position, self.goal)
+                if new_path:
+                    print(f"扩大搜索范围后找到路径")
+                    self.path = new_path
                     return True
-            
-            print(f"{self.name}#{self.robot_id} - 使用可能な経路が見つかりません")
-            return False 
+        
+        # 如果所有策略都失败，回退到基础行为
+        print(f"{self.name}#{self.robot_id} - 所有绕行策略失败，返回厨房")
+        if self.current_order:
+            self.fail_current_order("无法找到安全的替代路径")
+        self.return_to_kitchen()
+        return False 

@@ -1,100 +1,29 @@
-from modules.restaurant.restaurant_grid import RestaurantEnvironment
+from modules.restaurant.layout import RestaurantLayout
+from typing import Any, List, Tuple, Optional
 
 class Restaurant:
     """
-    餐厅类，用于创建和管理不同布局的餐厅环境
+    餐厅类，用于创建餐厅对象，该对象包含餐厅的基本信息和自定义布局。
+
+    使用方法：
+      1. 外部先创建一个继承或实现了 RestaurantLayout 接口的布局对象。
+      2. 将餐厅名称和该布局对象传入 Restaurant 的构造函数，从而实例化一个餐厅对象。
     """
-    def __init__(self, name, config=None):
+
+    def __init__(self, name: str, layout: RestaurantLayout) -> None:
         """
-        初始化餐厅
-        
-        参数:
-            name (str): 餐厅名称
-            config (dict): 餐厅配置信息，包括以下键:
-                - grid: 网格布局
-                - table_positions: 桌子位置
-                - kitchen_positions: 厨房位置
-                - parking_position: 机器人停靠点位置（可选）
-                - height: 高度（可选）
-                - width: 宽度（可选）
+        初始化餐厅对象
+
+        参数：
+          name (str): 餐厅名称。
+          layout (RestaurantLayout): 由外部创建的餐厅布局实例，允许用户自由选择或配置不同布局。
+
+        示例：
+          >>> from modules.restaurant.some_layout import SomeRestaurantLayout
+          >>> layout = SomeRestaurantLayout(config)
+          >>> restaurant = Restaurant("我的餐厅", layout)
         """
         self.name = name
+        self.layout = layout
+        self.original_layout = None  # 存储原始布局文本
         
-        if config is None:
-            # 默认使用空餐厅
-            self.environment = RestaurantEnvironment()
-        else:
-            grid = config.get('grid')
-            table_positions = config.get('table_positions', {})
-            kitchen_positions = config.get('kitchen_positions', [])
-            parking_position = config.get('parking_position')
-            
-            # 创建餐厅环境
-            self.environment = RestaurantEnvironment(
-                grid=grid,
-                table_positions=table_positions,
-                kitchen_positions=kitchen_positions,
-                parking_position=parking_position
-            )
-    
-    @classmethod
-    def from_layout(cls, name, layout_module):
-        """
-        从布局模块创建餐厅
-        
-        参数:
-            name (str): 餐厅名称
-            layout_module: 布局模块，必须包含get_config()函数
-            
-        返回:
-            Restaurant: 新创建的餐厅实例
-        """
-        config = layout_module.get_config()
-        return cls(name, config)
-    
-    def display(self, path=None, robot_position=None):
-        """显示餐厅布局"""
-        print(f"===== 餐厅: {self.name} =====")
-        self.environment.display(path, robot_position)
-    
-    def display_full(self, kitchen_position=None):
-        """显示详细餐厅布局"""
-        from modules.restaurant.restaurant_layout import display_full_restaurant
-        print(f"===== 餐厅: {self.name} - 详细视图 =====")
-        display_full_restaurant(self.environment, kitchen_position)
-        
-    def print_info(self):
-        """打印餐厅信息"""
-        from modules.restaurant.restaurant_layout import print_restaurant_info
-        print(f"===== 餐厅: {self.name} - 信息 =====")
-        print_restaurant_info(self.environment)
-        
-    @property
-    def tables(self):
-        """获取所有桌子位置"""
-        return self.environment.tables
-        
-    @property
-    def kitchen(self):
-        """获取厨房位置"""
-        return self.environment.kitchen
-        
-    @property
-    def parking(self):
-        """获取机器人停靠点位置"""
-        return self.environment.parking
-        
-    @property
-    def grid(self):
-        """获取餐厅网格"""
-        return self.environment.grid
-        
-    @property
-    def height(self):
-        """获取餐厅高度"""
-        return self.environment.height
-        
-    @property
-    def width(self):
-        """获取餐厅宽度"""
-        return self.environment.width 
