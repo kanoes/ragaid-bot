@@ -1,4 +1,8 @@
-# modules/robot/path_planning/path_planner.py
+# modules/robot/path_planner.py
+"""
+路径规划模块
+包含A*算法实现的PathPlanner类，用于机器人在餐厅环境中的路径规划。
+"""
 import heapq
 
 class PathPlanner:

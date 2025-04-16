@@ -1,13 +1,9 @@
 from modules.robot.path_planner import PathPlanner
+from modules.robot.order import Order
+from modules.rag.rag_assistant import RagAssistant
+import random
 import time
-
-# 条件导入RAG助手
-try:
-    from modules.rag.rag_assistant import RagAssistant
-    RAG_AVAILABLE = True
-except ImportError:
-    RAG_AVAILABLE = False
-    print("警告: RAG模块不可用，将使用基础机器人功能")
+import sys
 
 class Robot:
     """
@@ -32,7 +28,7 @@ class Robot:
         self.robot_id = robot_id  # 机器人ID
         
         # 设置机器人名称
-        self.enable_rag = enable_rag and RAG_AVAILABLE
+        self.enable_rag = enable_rag
         self.name = "智能机器人" if self.enable_rag else "基础机器人"
         
         # 获取所有厨房位置
@@ -59,6 +55,14 @@ class Robot:
         self.failed_orders = []    # 配送失败订单列表
         self.idle = True           # 机器人是否空闲
         self.kitchen_position = self.start  # 厨房位置（默认为起始点）
+        
+        # 初始化统计信息
+        self._stats = {
+            "successful_deliveries": 0,
+            "failed_deliveries": 0,
+            "total_distance": 0,
+            "total_time": 0
+        }
         
         # 初始化RAG助手（如果启用）
         self.rag_assistant = None
@@ -414,8 +418,6 @@ class Robot:
             print("环境中没有桌子，无法进行测试")
             return
         
-        from modules.order import Order
-        import random
         
         # 创建测试订单
         test_orders = []
@@ -445,21 +447,34 @@ class Robot:
         处理订单，兼容main.py中的调用
         
         参数:
-            order: 字典格式的订单 {'table_id': xxx, 'items': xxx, ...}
+            order: 字典格式的订单 {'table_id': xxx, 'items': xxx, 'time': xxx, ...}
             
         返回:
             bool: 订单处理是否成功
         """
-        from modules.order import Order
+        # 直接从当前模块导入，避免循环导入
+        # 获取当前模块
+        current_module = sys.modules[__name__]
         
         # 将字典格式转换为Order对象
         if isinstance(order, dict):
             table_id = order.get('table_id')
             items = order.get('items', 1)
-            order_obj = Order(order_id=self.stats['successful_deliveries'] + self.stats['failed_deliveries'] + 1,
-                            table_id=table_id,
-                            prep_time=0,
-                            items=[f"物品{i+1}" for i in range(items)])
+            # 从'time'字段获取准备时间，这与main.py中使用的字段名一致
+            prep_time = order.get('time', 0) or order.get('prep_time', 0)
+            
+            # 导入Order类（如果当前模块没有，则从robot.order导入）
+            if hasattr(current_module, 'Order'):
+                OrderClass = current_module.Order
+            else:
+                from modules.robot.order import Order as OrderClass
+                
+            order_obj = OrderClass(
+                order_id=self.stats['successful_deliveries'] + self.stats['failed_deliveries'] + 1,
+                table_id=table_id,
+                prep_time=prep_time,  # 传递准备时间
+                items=[f"物品{i+1}" for i in range(items)]
+            )
         else:
             # 如果已经是Order对象，直接使用
             order_obj = order

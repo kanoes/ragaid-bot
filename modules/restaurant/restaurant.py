@@ -25,5 +25,4 @@ class Restaurant:
         """
         self.name = name
         self.layout = layout
-        self.original_layout = None  # 存储原始布局文本
         
