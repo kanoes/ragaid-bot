@@ -1,377 +1,254 @@
+"""
+餐厅送餐机器人模拟系统
+
+主程序入口
+"""
+
 import time
-import threading
-import argparse
+import random
 import os
 import json
-import sys
-import warnings
-import dotenv
-import matplotlib.pyplot as plt
-import pandas as pd
-from matplotlib.font_manager import FontProperties
+from modules.restaurant import (
+    list_restaurant_layouts, 
+    select_restaurant_layout, 
+    Restaurant
+)
+from modules.robot import Robot, AIEnhancedRobot
 
-from colorama import Fore, Style, init
-
-# .envファイルから環境変数を読み込む
-dotenv.load_dotenv()
-
-# matplotlibの日本語フォントサポートを設定
-try:
-    # 特定のフォント設定環境変数が存在するかチェック
-    font_path = os.environ.get('MATPLOTLIB_FONT', None)
-    if font_path and os.path.exists(font_path):
-        # 指定されたフォントファイルを使用
-        font_prop = FontProperties(fname=font_path)
-        plt.rcParams['font.family'] = font_prop.get_name()
-    else:
-        # システムの日本語フォントを試用
-        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS']
-        plt.rcParams['axes.unicode_minus'] = False  # マイナス記号表示の問題を解決
-except Exception as e:
-    print(f"日本語フォント設定エラー: {e}")
-    print("デフォルトフォントを使用します")
-
-# matplotlibの日本語フォント警告をフィルタリング
-warnings.filterwarnings("ignore", category=UserWarning, module="tkinter")
-
-# 英語タイトルを使用する必要があるかチェック（ASCIIモード）
-ASCII_MODE = False
-if "--ascii" in sys.argv:
-    ASCII_MODE = True
-    sys.argv.remove("--ascii")
-    print("ASCIIモード（英語タイトル）で実行中")
-
-from modules.environment import RestaurantEnvironment, create_restaurant_layout, print_restaurant_info, display_full_restaurant
-from modules.robot import Robot
-from modules.utils import animate_robot_path, OrderManager, Order
-
-def get_title(zh_title, en_title):
-    """ASCIIモードに基づいて適切なタイトルを返す"""
-    return en_title if ASCII_MODE else zh_title
-
-def process_kitchen(order_manager, stop_event):
-    """
-    キッチン処理スレッド、キッチンの注文準備をシミュレート
-    """
-    while not stop_event.is_set():
-        order_manager.process_kitchen_simulation()
-        time.sleep(0.5)
-
-def run_baseline_simulation(restaurant, order_manager, robot_count=1):
-    """
-    ベースラインロボットを使用して注文配送シミュレーションを実行
-    """
-    print("\n===== ベースラインロボットシミュレーション開始 =====")
-    
-    # ロボットを作成
-    robots = []
-    for i in range(robot_count):
-        robot = Robot(restaurant, robot_id=i+1, enable_rag=False)
-        robots.append(robot)
-    
-    # キッチン処理スレッドを開始
-    stop_event = threading.Event()
-    kitchen_thread = threading.Thread(target=process_kitchen, args=(order_manager, stop_event))
-    kitchen_thread.daemon = True
-    kitchen_thread.start()
-    
-    # シミュレーション実行
-    simulation_time = 0
-    max_simulation_time = 60  # 最大60秒シミュレーション
-    
-    try:
-        while simulation_time < max_simulation_time:
-            print(f"\n現在のシミュレーション時間: {simulation_time}秒")
-            # 準備完了した注文の割り当てを確認
-            for robot in robots:
-                if robot.is_idle():
-                    next_order = order_manager.get_next_delivery_order()
-                    if next_order:
-                        order_manager.assign_order_to_robot(next_order.order_id, robot.robot_id)
-                        robot.assign_order(next_order)
-            
-            # 全ロボットを1ステップ実行
-            for robot in robots:
-                if robot.path:
-                    robot.move()
-                    if robot.current_order:
-                        if robot.position == robot.goal:
-                            order_manager.complete_order_delivery(robot.current_order.order_id)
-                        elif hasattr(robot.current_order, 'delivered_flag'):
-                            order_manager.complete_order_delivery(robot.current_order.order_id)
-                            print(f"注文 #{robot.current_order.order_id} の状態を手動で更新（配達済みがキッチンに戻っていない）")
-            
-            time.sleep(0.5)
-            simulation_time += 1
-            
-            # 処理待ちの注文がなく、全ロボットがアイドル状態の場合、シミュレーションを早期終了
-            if (not order_manager.waiting_orders and 
-                not order_manager.preparing_orders and 
-                not order_manager.ready_orders and
-                not order_manager.delivering_orders and
-                all(robot.current_order is None or hasattr(robot.current_order, 'delivered_flag') for robot in robots)):
-                print("すべての注文が処理完了、シミュレーション終了")
-                for robot in robots:
-                    if robot.current_order and hasattr(robot.current_order, 'delivered_flag'):
-                        order_manager.complete_order_delivery(robot.current_order.order_id)
-                        robot.current_order = None
-                break
-    
-    finally:
-        stop_event.set()
-        kitchen_thread.join(timeout=1)
-    
-    print("\n===== ベースラインロボットシミュレーション結果 =====")
-    print("注文統計:")
-    stats = order_manager.get_statistics()
-    print(f"  総注文数: {stats['total_orders']}")
-    print(f"  完了注文数: {stats['completed_orders']}")
-    print(f"  失敗注文数: {stats['failed_orders']}")
-    print(f"  配送成功率: {stats['success_rate']:.2f}%")
-    print(f"  平均配送時間: {stats['avg_delivery_time']:.2f}秒")
-    
-    for i, robot in enumerate(robots):
-        print(f"\nロボット #{i+1} の経路:")
-        if robot.path_history:
-            print(f"経路履歴の長さ: {len(robot.path_history)}")
-            title = get_title(f"ベースラインロボット #{i+1} の経路", f"Baseline Robot #{i+1} Path")
-            animate_robot_path(robot.path_history, title=title)
-        else:
-            print("  経路記録なし")
-    
-    return stats
-
-def run_rag_simulation(restaurant, order_manager, robot_count=1, api_key=None, knowledge_file=None):
-    """
-    RAGロボットを使用して注文配送シミュレーションを実行
-    パラメータ:
-        restaurant: レストラン環境
-        order_manager: 注文マネージャー
-        robot_count: ロボット数
-        api_key: OpenAI APIキー
-        knowledge_file: 知識ベースファイルパス
-    """
-    print("\n===== RAGロボットシミュレーション開始 =====")
-    
-    # ロボットを作成
-    robots = []
-    for i in range(robot_count):
-        try:
-            robot = Robot(restaurant, robot_id=i+1, enable_rag=True, 
-                          api_key=api_key, knowledge_file=knowledge_file)
-            robots.append(robot)
-        except Exception as e:
-            print(f"RAGロボットの作成に失敗: {e}")
-            print("代わりにベースラインロボットを使用")
-            robot = Robot(restaurant, robot_id=i+1, enable_rag=False)
-            robots.append(robot)
-    
-    # キッチン処理スレッドを開始
-    stop_event = threading.Event()
-    kitchen_thread = threading.Thread(target=process_kitchen, args=(order_manager, stop_event))
-    kitchen_thread.daemon = True
-    kitchen_thread.start()
-    
-    simulation_time = 0
-    max_simulation_time = 60  # 最大60秒シミュレーション
-    
-    try:
-        while simulation_time < max_simulation_time:
-            print(f"\n現在のシミュレーション時間: {simulation_time}秒")
-            for robot in robots:
-                if robot.is_idle():
-                    next_order = order_manager.get_next_delivery_order()
-                    if next_order:
-                        order_manager.assign_order_to_robot(next_order.order_id, robot.robot_id)
-                        path_success = robot.assign_order(next_order)
-                        if path_success and robot.enable_rag and simulation_time > 3:
-                            print("\nRAG障害物処理総合テストを実行中...")
-                            robot.comprehensive_test()
-            
-            for robot in robots:
-                if robot.path:
-                    robot.move()
-                    if robot.current_order:
-                        if robot.position == robot.goal:
-                            order_manager.complete_order_delivery(robot.current_order.order_id)
-                        elif hasattr(robot.current_order, 'delivered_flag'):
-                            order_manager.complete_order_delivery(robot.current_order.order_id)
-                            print(f"注文 #{robot.current_order.order_id} の状態を手動で更新（配達済みがキッチンに戻っていない）")
-            
-            time.sleep(0.5)
-            simulation_time += 1
-            if (not order_manager.waiting_orders and 
-                not order_manager.preparing_orders and 
-                not order_manager.ready_orders and
-                not order_manager.delivering_orders and
-                all(robot.current_order is None or hasattr(robot.current_order, 'delivered_flag') for robot in robots)):
-                print("すべての注文が処理完了、シミュレーション終了")
-                for robot in robots:
-                    if robot.current_order and hasattr(robot.current_order, 'delivered_flag'):
-                        order_manager.complete_order_delivery(robot.current_order.order_id)
-                        robot.current_order = None
-                break
-    
-    finally:
-        stop_event.set()
-        kitchen_thread.join(timeout=1)
-    
-    print(f"\n===== RAGロボットシミュレーション結果 =====")
-    print("注文統計:")
-    stats = order_manager.get_statistics()
-    print(f"  総注文数: {stats['total_orders']}")
-    print(f"  完了注文数: {stats['completed_orders']}")
-    print(f"  失敗注文数: {stats['failed_orders']}")
-    print(f"  配送成功率: {stats['success_rate']:.2f}%")
-    print(f"  平均配送時間: {stats['avg_delivery_time']:.2f}秒")
-    
-    for i, robot in enumerate(robots):
-        print(f"\nロボット #{i+1} の経路:")
-        if robot.path_history:
-            print(f"経路履歴の長さ: {len(robot.path_history)}")
-            title = get_title(f"RAGロボット #{i+1} の経路", f"RAG Robot #{i+1} Path")
-            animate_robot_path(robot.path_history, title=title)
-        else:
-            print("  経路記録なし")
-    
-    return stats
-
-def compare_simulation_results(baseline_stats, rag_stats):
-    """
-    二種類のロボットのシミュレーション結果を比較
-    """
-    print("\n===== シミュレーション結果比較 =====")
-    print("指標\t\tベースラインロボット\tRAGロボット\t差異")
-    print("-" * 60)
-    
-    completed_diff = rag_stats['completed_orders'] - baseline_stats['completed_orders']
-    failed_diff = rag_stats['failed_orders'] - baseline_stats['failed_orders']
-    success_rate_diff = rag_stats['success_rate'] - baseline_stats['success_rate']
-    time_diff = baseline_stats['avg_delivery_time'] - rag_stats['avg_delivery_time']
-    
-    print(f"完了注文数\t{baseline_stats['completed_orders']}\t\t{rag_stats['completed_orders']}\t\t{completed_diff:+d}")
-    print(f"失敗注文数\t{baseline_stats['failed_orders']}\t\t{rag_stats['failed_orders']}\t\t{failed_diff:+d}")
-    print(f"配送成功率\t{baseline_stats['success_rate']:.2f}%\t\t{rag_stats['success_rate']:.2f}%\t\t{success_rate_diff:+.2f}%")
-    print(f"平均配送時間\t{baseline_stats['avg_delivery_time']:.2f}秒\t{rag_stats['avg_delivery_time']:.2f}秒\t{time_diff:+.2f}秒")
-
-def input_orders():
-    """
-    ユーザー入力から注文を取得
-    """
-    order_manager = OrderManager()
-    
-    print("\n===== 注文入力 =====")
-    print("注文情報を入力してください（'完了'と入力して終了）")
-    print("形式: テーブル番号 準備時間(秒)")
-    
-    while True:
-        order_input = input("注文> ")
-        if order_input.lower() in ['完了', 'done', 'q', 'quit', 'exit']:
-            break
-        
-        try:
-            parts = order_input.split()
-            if len(parts) >= 2:
-                table_id = int(parts[0])
-                prep_time = float(parts[1])
-                items = parts[2:] if len(parts) > 2 else []
-                order_manager.create_order(table_id, prep_time, items)
-            else:
-                print("形式エラー。形式を使用してください: テーブル番号 準備時間")
-        except ValueError:
-            print("無効な入力。テーブル番号は整数、準備時間は数値である必要があります。")
-    
-    return order_manager
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="レストラン配送ロボットシミュレーション")
-    parser.add_argument('--api_key', type=str, help='OpenAI APIキー')
-    parser.add_argument('--knowledge', type=str, default='knowledge.json', help='知識ベースファイルパス')
-    parser.add_argument('--skip_baseline', action='store_true', help='ベースラインシミュレーションをスキップ')
-    parser.add_argument('--ascii', action='store_true', help='ASCIIモードを使用（日本語レンダリングの問題を回避）')
-    parser.add_argument('--font', type=str, help='グラフ表示用のフォントを指定')
-    return parser.parse_args()
+# 获取布局文件目录路径
+LAYOUTS_DIR = os.path.join(os.path.dirname(__file__), 'modules', 'restaurant', 'layouts')
 
 def main():
-    """
-    メイン関数、レストラン配送シミュレーションを実行
-    """
-    args = parse_arguments()
+    """主程序"""
+    print("\n===== 餐厅送餐机器人模拟系统 =====")
     
-    if args.font:
-        os.environ['MATPLOTLIB_FONT'] = args.font
-        print(f"カスタムフォントを使用: {args.font}")
-    
-    global ASCII_MODE
-    ASCII_MODE = args.ascii
-    if ASCII_MODE:
-        print("ASCIIモード表示を使用、日本語レンダリングの問題を回避")
-    
-    # 環境変数から直接OpenAI APIキーを読み取る（ユーザー入力やセーブを求めない）
-    api_key = args.api_key or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        print("エラー: 環境変数にOpenAI APIキーが見つかりません。.envファイルでOPENAI_API_KEYを設定してください")
-        sys.exit(1)
-    
-    # 知識ベースファイルが存在することを確認
-    ensure_knowledge_file(args.knowledge)
-    
-    # レストラン環境を作成
-    restaurant = create_restaurant_layout()
-    print_restaurant_info(restaurant)
-    
-    kitchen_pos = restaurant.get_kitchen_positions()[0]
-    display_full_restaurant(restaurant, kitchen_pos)
-    
-    order_manager = input_orders()
-    if not order_manager.orders:
-        print("注文が入力されていません、プログラム終了")
+    # 检查是否有可用的餐厅布局
+    layouts = list_restaurant_layouts()
+    if not layouts:
+        print("错误: 没有找到任何餐厅布局文件!")
+        print(f"请先创建餐厅布局JSON文件并放置在{LAYOUTS_DIR}目录中")
+        print("布局文件格式示例:")
+        print('''{
+  "name": "示例餐厅",
+  "layout": [
+    "WWWWWWWWWW",
+    "WSSSSSSSW",
+    "WSK01S02W",
+    "WSSSSSSSW",
+    "WWWWWWWWWW"
+  ]
+}''')
+        print("\n其中W表示墙壁，S表示空地，K表示厨房，01-99表示桌子编号")
         return
     
-    baseline_stats = None
-    if not args.skip_baseline:
-        baseline_order_manager = OrderManager()
-        for order in order_manager.orders.values():
-            baseline_order_manager.create_order(order.table_id, order.prep_time, order.items)
-        baseline_stats = run_baseline_simulation(restaurant, baseline_order_manager)
-    
-    rag_order_manager = OrderManager()
-    for order in order_manager.orders.values():
-        rag_order_manager.create_order(order.table_id, order.prep_time, order.items)
-    
-    rag_stats = run_rag_simulation(restaurant, rag_order_manager,
-                                   api_key=api_key,
-                                   knowledge_file=args.knowledge)
-    
-    if baseline_stats:
-        compare_simulation_results(baseline_stats, rag_stats)
+    # 显示主菜单
+    while True:
+        print("\n===== 主菜单 =====")
+        print("1. 查看可用餐厅布局")
+        print("2. 加载餐厅模拟")
+        print("3. 退出")
+        
+        choice = input("\n请选择 (1-3): ").strip()
+        
+        if choice == "1":
+            # 显示所有可用布局文件的内容
+            display_available_layouts(layouts)
+        elif choice == "2":
+            # 加载餐厅布局并启动模拟
+            restaurant = select_restaurant_layout()
+            if restaurant:
+                run_robot_simulation(restaurant)
+        else:
+            print("感谢使用餐厅送餐机器人模拟系统!")
+            break
 
-def ensure_knowledge_file(knowledge_file_path):
-    """知識ベースファイルが存在することを確認し、存在しない場合はサンプル知識ベースを作成"""
-    if os.path.exists(knowledge_file_path):
-        print(f"知識ベースファイルが存在します: {knowledge_file_path}")
+def display_available_layouts(layouts):
+    """直接显示所有可用的布局文件内容"""
+    print("\n===== 可用的餐厅布局 =====")
+    
+    for i, layout_name in enumerate(layouts):
+        json_path = os.path.join(LAYOUTS_DIR, f"{layout_name}.json")
+        
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            print(f"\n{i+1}. {layout_name}")
+            print("-" * 30)
+            
+            # 显示名称
+            name = data.get('name', layout_name)
+            print(f"餐厅名称: {name}")
+            
+            # 显示原始布局
+            if 'layout' in data:
+                print("\n原始布局:")
+                for line in data['layout']:
+                    print(line)
+            
+            print("-" * 30)
+            
+        except Exception as e:
+            print(f"\n{i+1}. {layout_name} - 无法读取: {e}")
+    
+    print("\n" + "=" * 40)
+
+def run_robot_simulation(restaurant):
+    """运行机器人模拟测试"""
+    print(f"\n===== 餐厅 '{restaurant.name}' 模拟测试 =====")
+    restaurant.display()
+    
+    # 获取餐厅中所有桌子的ID
+    table_ids = list(restaurant.tables.keys())
+    if not table_ids:
+        print("错误: 当前餐厅没有任何桌子，无法进行送餐测试")
         return
     
-    print(f"知識ベースファイルが存在しません、サンプル知識ベースを作成: {knowledge_file_path}")
-    dirname = os.path.dirname(knowledge_file_path)
-    if dirname:
-        os.makedirs(dirname, exist_ok=True)
+    # 询问用户选择模拟类型
+    print("\n请选择模拟类型:")
+    print("1. 基础送餐机器人")
+    print("2. AI增强型送餐机器人")
+    print("3. 对比测试 (两种机器人)")
     
-    example_knowledge = [
-        "ロボットが障害物に遭遇した場合、まず障害物の性質を評価する必要があります。一時的な障害物であれば、短時間待ってから再試行できます。永続的な障害物であれば、経路を再計画する必要があります。",
-        "レストラン環境では、混雑エリアは通常一時的な障害物であり、ロボットは減速して通過を待つべきです。",
-        "短時間に同じ位置で複数回障害物に遭遇した場合、その障害物は永続的である可能性が高いため、代替経路を探すべきです。",
-        "ロボットが実行可能な経路を見つけられない場合は、目的地に到達できないことを報告すべきです。",
-        "移動中の人や物体に遭遇した場合は、迂回を試みるのではなく、それらが通過するのを待つべきです。",
-        "目標が障害物に囲まれている場合、障害物が一時的である可能性があるため、しばらく待ってから近づくことを試みるべきです。",
-        "交通量の多いエリアでは、ロボットはできるだけ端を走行し、他の人々の通行を妨げないようにすべきです。",
-        "複数回の迂回の試みが失敗した場合、ロボットは経路が長くなっても、完全に異なる経路を検討すべきです。"
-    ]
+    sim_choice = input("选择 (1-3): ").strip()
     
-    with open(knowledge_file_path, 'w', encoding='utf-8') as f:
-        json.dump(example_knowledge, f, ensure_ascii=False, indent=2)
+    # 设置订单数量
+    try:
+        num_orders = int(input("\n请输入要测试的订单数量 (1-20): ").strip())
+        num_orders = max(1, min(20, num_orders))  # 限制在1-20之间
+    except ValueError:
+        num_orders = 5  # 默认值
+        print(f"使用默认订单数量: {num_orders}")
     
-    print(f"サンプル知識ベース作成成功、{len(example_knowledge)}個の知識エントリを含む")
+    # 生成随机订单
+    orders = generate_orders(num_orders, table_ids)
+    
+    # 根据用户选择运行模拟
+    if sim_choice == "1":
+        # 基础送餐机器人
+        run_single_robot_test(restaurant, orders, use_ai=False)
+    elif sim_choice == "2":
+        # AI增强型送餐机器人
+        run_single_robot_test(restaurant, orders, use_ai=True)
+    else:
+        # 对比测试
+        compare_robots(restaurant, orders)
+
+def generate_orders(num_orders, table_ids):
+    """生成随机订单"""
+    orders = []
+    for _ in range(num_orders):
+        table_id = random.choice(table_ids)
+        items = random.randint(1, 5)  # 随机1-5个餐品
+        
+        order = {
+            "table_id": table_id,
+            "items": items,
+            "time": time.time()
+        }
+        orders.append(order)
+    
+    return orders
+
+def run_single_robot_test(restaurant, orders, use_ai=False):
+    """单个机器人测试"""
+    if use_ai:
+        robot = AIEnhancedRobot(restaurant)
+        print("\n===== 使用AI增强型送餐机器人运行模拟 =====")
+    else:
+        robot = Robot(restaurant)
+        print("\n===== 使用基础送餐机器人运行模拟 =====")
+    
+    # 显示初始状态
+    print("初始餐厅状态:")
+    restaurant.display(robot_position=robot.position)
+    
+    # 处理订单
+    print(f"\n开始处理 {len(orders)} 个订单...")
+    for i, order in enumerate(orders):
+        print(f"\n处理订单 {i+1}/{len(orders)} - 桌号: {order['table_id']}, 物品数: {order['items']}")
+        success = robot.take_order(order)
+        if success:
+            print(f"  订单送达成功! 路径长度: {len(robot.path)}")
+        else:
+            print(f"  订单送达失败!")
+        
+        # 显示机器人当前位置
+        restaurant.display(path=robot.path, robot_position=robot.position)
+    
+    # 显示统计信息
+    robot.display_stats()
+
+def compare_robots(restaurant, orders):
+    """比较两种机器人的性能"""
+    print("\n===== 机器人对比测试 =====")
+    
+    # 运行基础机器人模拟
+    basic_robot = Robot(restaurant)
+    print("\n[基础机器人测试开始]")
+    
+    # 显示初始状态
+    print("初始餐厅状态:")
+    restaurant.display(robot_position=basic_robot.position)
+    
+    # 处理订单
+    for i, order in enumerate(orders):
+        print(f"\n处理订单 {i+1}/{len(orders)} - 桌号: {order['table_id']}")
+        success = basic_robot.take_order(order)
+        if success:
+            print(f"  送达成功!")
+        else:
+            print(f"  送达失败!")
+    
+    # 显示统计信息
+    basic_robot.display_stats()
+    basic_stats = basic_robot.stats
+    
+    # 运行AI增强型机器人模拟
+    ai_robot = AIEnhancedRobot(restaurant)
+    print("\n[AI增强型机器人测试开始]")
+    
+    # 显示初始状态
+    print("初始餐厅状态:")
+    restaurant.display(robot_position=ai_robot.position)
+    
+    # 处理订单
+    for i, order in enumerate(orders):
+        print(f"\n处理订单 {i+1}/{len(orders)} - 桌号: {order['table_id']}")
+        success = ai_robot.take_order(order)
+        if success:
+            print(f"  送达成功!")
+        else:
+            print(f"  送达失败!")
+    
+    # 显示统计信息
+    ai_robot.display_stats()
+    ai_stats = ai_robot.stats
+    
+    # 比较结果
+    num_orders = len(orders)
+    print("\n===== 性能对比总结 =====")
+    print(f"总订单数: {num_orders}")
+    print(f"基础机器人成功率: {basic_stats['successful_deliveries']/num_orders*100:.2f}%")
+    print(f"AI增强机器人成功率: {ai_stats['successful_deliveries']/num_orders*100:.2f}%")
+    
+    if basic_stats['successful_deliveries'] > 0 and ai_stats['successful_deliveries'] > 0:
+        basic_avg_dist = basic_stats['total_distance'] / basic_stats['successful_deliveries']
+        ai_avg_dist = ai_stats['total_distance'] / ai_stats['successful_deliveries']
+        
+        basic_avg_time = basic_stats['total_time'] / basic_stats['successful_deliveries']
+        ai_avg_time = ai_stats['total_time'] / ai_stats['successful_deliveries']
+        
+        print(f"基础机器人平均路径长度: {basic_avg_dist:.2f}")
+        print(f"AI增强机器人平均路径长度: {ai_avg_dist:.2f}")
+        print(f"基础机器人平均送达时间: {basic_avg_time:.2f}秒")
+        print(f"AI增强机器人平均送达时间: {ai_avg_time:.2f}秒")
+        
+        if ai_avg_dist < basic_avg_dist:
+            print(f"AI增强机器人路径效率提升: {(basic_avg_dist - ai_avg_dist) / basic_avg_dist * 100:.2f}%")
+        
+        if ai_avg_time < basic_avg_time:
+            print(f"AI增强机器人时间效率提升: {(basic_avg_time - ai_avg_time) / basic_avg_time * 100:.2f}%")
 
 if __name__ == "__main__":
     main()

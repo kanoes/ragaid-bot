@@ -1,0 +1,13 @@
+{
+  "layout": [
+    "W W W W W W W W W W W W W W W",
+    "W S S S S S S S S S S S S S W",
+    "W 01 S S 02 S S 03 S S 04 S S W",
+    "W S S S S S S S S S S S S S W",
+    "W S S S S W W W W S S S K1 S W",
+    "W S S S S W P S S S S S K2 S W",
+    "W 05 S S 06 S S 07 S S 08 S S W",
+    "W S S S S S S S S S S S S S W",
+    "W W W W W W W W W W W W W W W"
+  ]
+} 

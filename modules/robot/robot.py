@@ -1,4 +1,4 @@
-from modules.utils.path_planner import PathPlanner
+from modules.robot.path_planning import PathPlanner
 import time
 
 # 条件付きでRAGアシスタントをインポート
@@ -474,4 +474,85 @@ class Robot:
             else:
                 print(f"位置 {pos} 現在値が {original_value}、空地ではないため、テストをスキップ")
         
-        print(f"\n===== 総合テスト完了 =====\n") 
+        print(f"\n===== 総合テスト完了 =====\n")
+
+class AIEnhancedRobot(Robot):
+    """
+    RAG技術で強化されたスマートロボット
+    基本ロボットの全機能に加え、より高度な意思決定能力を持ちます
+    """
+    def __init__(self, environment, start=None, goal=None, robot_id=1, api_key=None, knowledge_file=None):
+        """AIロボットを初期化"""
+        super().__init__(
+            environment=environment, 
+            start=start, 
+            goal=goal, 
+            robot_id=robot_id,
+            enable_rag=True,  # RAG機能を有効化
+            api_key=api_key, 
+            knowledge_file=knowledge_file
+        )
+        
+        # 名前をより明確に
+        self.name = "RAG強化ロボット"
+        print(f"{self.name}#{self.robot_id} - 初期化完了、スマート意思決定有効")
+    
+    def handle_obstacle(self, obstacle_position):
+        """
+        障害物を処理する強化版メソッド
+        常にRAGアシスタントを使用し、失敗時のみ基本戦略にフォールバック
+        """
+        # RAGアシスタントが利用可能な場合は使用
+        if self.rag_assistant and self.rag_assistant.is_ready:
+            return self._handle_obstacle_with_rag(obstacle_position)
+        else:
+            # 基本戦略にフォールバック
+            print(f"{self.name}#{self.robot_id} - RAGアシスタントが利用できません。基本戦略にフォールバック。")
+            return super().handle_obstacle(obstacle_position)
+    
+    def find_alternative_path(self, obstacle_position):
+        """
+        障害物を回避する代替経路を探す強化版メソッド
+        より広範囲に経路を探索
+        """
+        print(f"{self.name}#{self.robot_id} - 高度な経路探索アルゴリズムを使用")
+        
+        # 現在の経路を保存
+        original_path = self.path.copy() if self.path else []
+        
+        # 障害物周辺を迂回する経路を広範囲に探索
+        # 現在位置から目標までの直接経路を再計画
+        new_path = self.planner.find_path(self.position, self.goal)
+        
+        if new_path:
+            print(f"{self.name}#{self.robot_id} - 新しい経路を見つけました: {len(new_path)} ステップ")
+            self.path = new_path
+            return True
+        else:
+            print(f"{self.name}#{self.robot_id} - 現在位置から直接到達できる経路が見つかりません")
+            
+            # キッチンへの復帰経路を計画
+            if self.kitchen_position:
+                print(f"{self.name}#{self.robot_id} - キッチンへの帰還経路を検討")
+                kitchen_path = self.planner.find_path(self.position, self.kitchen_position)
+                if kitchen_path:
+                    # 戦略的撤退 - いったんキッチンに戻ってから再計画
+                    print(f"{self.name}#{self.robot_id} - 一時的にキッチンに戻ります")
+                    self.path = kitchen_path
+                    return True
+            
+            # 元の経路に戻す（現在位置以前は削除）
+            if original_path:
+                current_index = -1
+                for i, pos in enumerate(original_path):
+                    if pos == self.position:
+                        current_index = i
+                        break
+                
+                if current_index >= 0 and current_index < len(original_path) - 1:
+                    print(f"{self.name}#{self.robot_id} - 元の経路に戻って別のアプローチを試みます")
+                    self.path = original_path[current_index:]
+                    return True
+            
+            print(f"{self.name}#{self.robot_id} - 使用可能な経路が見つかりません")
+            return False 
