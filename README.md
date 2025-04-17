@@ -1,113 +1,104 @@
-# 餐厅送餐机器人模拟系统
+# ragaid‑bot
 
-这是一个基于Python的餐厅送餐机器人模拟系统，旨在比较传统机器人与基于生成式AI和检索增强生成(RAG)技术的智能机器人在餐厅环境中的送餐效率。
+**ragaid‑bot** 是一个基于 Python 的 2‑D 餐厅配送机器人模拟框架，用来比较  
+传统规则机器人与 **RAG（Retrieval‑Augmented Generation）增强机器人** 的
+路径效率、成功率与决策表现。  
 
-## 项目概述
+---
 
-本项目是一个毕业设计项目，主要包含以下功能：
+## 功能速览
 
-- 餐厅环境设计与布局编辑
-- 基础送餐机器人实现
-- AI增强型送餐机器人实现
-- 路径规划与寻路算法
-- 订单处理与管理
-- 性能对比与分析
+| 功能 | 说明 |
+|------|------|
+| **餐厅布局** | JSON 描述房间网格，可视化 CLI 设计器 |
+| **路径规划** | A\* 寻路 + 可扩展 Planner 策略 |
+| **基础机器人** | 单体机器人，支持接单、移动、统计 |
+| **AI 增强机器人** | 内置 RAGModule<br>• FAISS + OpenAI Embedding<br>• ChatCompletion 产出「绕行 / 等待 / 放弃」决策 |
+| **动作层** | `MotionController` 负责一步移动 + 障碍应对 |
+| **可视化** | Matplotlib 动画实时 / 离线 (`.gif` / `.mp4`) |
+| **统计与对比** | 成功率、平均时长、路径长度 |
 
-## 文件结构
+---
 
-餐厅送餐机器人模拟系统/
-├── main.py                      # 主程序入口
-├── create_restaurant_example.py # 餐厅布局创建示例
-├── modules/
-│   ├── restaurant/              # 餐厅相关模块
-│   │   ├── __init__.py          # 模块初始化文件
-│   │   ├── restaurant_grid.py   # 餐厅网格环境
-│   │   ├── restaurant.py        # 餐厅类
-│   │   ├── restaurant_layout.py # 餐厅布局工具
-│   │   ├── utils.py             # 餐厅工具函数
-│   │   └── layouts/             # 餐厅布局文件
-│   ├── robot/                   # 机器人相关模块
-│   │   ├── __init__.py          # 模块初始化文件
-│   │   ├── robot.py             # 机器人基类和AI增强型机器人
-│   │   └── path_planning/       # 路径规划子模块
-│   │       ├── __init__.py      # 模块初始化文件
-│   │       └── path_planner.py  # 路径规划算法
-│   ├── rag/                     # RAG相关模块
-│   │   ├── __init__.py          # 模块初始化文件
-│   │   ├── rag_assistant.py     # RAG助手
-│   │   └── knowledge/           # 知识库
-│   ├── order/                   # 订单处理模块
-│   │   ├── __init__.py          # 模块初始化文件
-│   │   └── order.py             # 订单类和订单管理器
-│   └── utils/                   # 工具模块
-│       ├── __init__.py          # 模块初始化文件
-│       └── visualization.py     # 可视化工具
-└── test/                        # 测试脚本
-    ├── test_load_restaurant.py  # 餐厅加载测试
-    └── test_delivery_simulation.py # 送餐模拟测试
+## 目录结构
 
-## 如何使用
-
-### 安装依赖
-
-```bash
-pip install colorama numpy matplotlib
+```text
+ragaid-bot/
+├─ resources/                 # JSON 布局 & 知识库
+│  ├─ my_restaurant/          # 预置餐厅布局
+│  └─ rag_knowledge/          # RAG 知识库
+├─ restaurant/                # 餐厅网格 & 布局解析
+├─ robot/
+│  ├─ motion_controller.py    # 行为执行层
+│  ├─ planner.py              # PathPlanner + OrderManager
+│  ├─ robot.py                # Robot / AIEnhancedRobot（调度层）
+│  └─ rag/                    # RAG 子包
+│      ├─ llm_client.py / …   # LLM & 向量检索
+├─ visualization/             # 动画可视化
+├─ main_runner.py             # 交互式 CLI
+└─ main.py                    # 仅包装 run()
 ```
 
-### 运行主程序
+---
+
+## 安装
+
+环境要求：Python 3.9+
 
 ```bash
+pip install -r requirements.txt
+# 或手动安装
+pip install numpy matplotlib faiss-cpu openai python-dotenv
+```
+
+> 若需保存 `.mp4` 请确保本机安装 [ffmpeg](https://ffmpeg.org)。
+
+---
+
+## 快速开始
+
+```bash
+# 交互 CLI
 python main.py
 ```
 
-### 创建餐厅布局
+交互流程：选择餐厅 → 选择是否使用 RAG 机器人 → 指定订单数量 → 动画展示 / 性能统计。
 
-```bash
-python create_restaurant_example.py
-```
-
-## 主要功能
-
-1. **餐厅布局设计**
-   - 支持自定义餐厅大小和布局
-   - 包含墙壁、餐桌、厨房和停车点
-   - 支持从JSON文件加载和保存布局
-
-2. **机器人模拟**
-   - 基础送餐机器人：使用基本寻路算法
-   - AI增强型机器人：结合RAG技术优化路径决策
-
-3. **性能对比**
-   - 对比两种机器人的送餐效率
-   - 分析成功率、平均送达时间和路径长度
+---
 
 ## 餐厅布局格式
 
-餐厅布局使用JSON文件存储，格式如下：
+*布局文件示例 `resources/my_restaurant/default_restaurant.json`*
 
 ```json
 {
+  "name": "default_restaurant",
   "layout": [
-    "W W W W W W W",
-    "W S S . . S W",
-    "W . . . . . W",
-    "W . K1 . K2 . W",
-    "W . . P . . W",
-    "W W W W W W W"
+    "＃ ＃ ＃ ＃ ＃ ＃ ＃",
+    "＃ * * * * * * ＃",
+    "＃ * A * B * C ＃",
+    "＃ * * * * * * ＃",
+    "＃ * D * * * E ＃",
+    "＃ * * * * * * ＃",
+    "＃ * 台 台 * F ＃ P",
+    "＃ ＃ ＃ ＃ ＃ ＃ ＃"
   ]
 }
 ```
 
-其中：
-- W: 墙壁
-- S: 座位/餐桌
-- K1-K9: 厨房点
-- P: 机器人停车点
-- .: 空白区域
+| 符号 | 含义 | 对应数值 |
+|------|------|----------|
+| `＃` / `W` | 墙壁 / 障碍 | 1 |
+| `*` / `.`  | 空地       | 0 |
+| `A‑Z`      | 桌子编号    | 2 |
+| `台`       | 厨房       | 3 |
+| `停` / `P` | 机器人停靠点 | 4 |
 
-## 扩展功能
+---
 
-- 支持多机器人协作
-- 添加真实AI服务连接
-- 实现更复杂的餐厅环境和障碍物
-- 优化路径规划算法
+## 扩展指南
+
+* **多机器人**：在 `main_runner` 中创建多个 `Robot` 实例并加入简单调度即可。  
+* **接入私有 LLM**：替换 `robot/rag/llm_client.py` 中的 `LLMClient` 实现即可。  
+* **更复杂底盘 / 物理碰撞**：仅需扩展 `MotionController`。  
+* **布局设计器**：运行 `python restaurant/restaurant_layout.py`（TODO: 待补充 CLI）。
