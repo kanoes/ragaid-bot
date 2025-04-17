@@ -1,0 +1,78 @@
+📦ragaid-bot
+ 
+ ┣ 📂.vscode
+ ┃ ┗ 📜settings.json
+ ┣ 📂resources
+ ┃ ┣ 📂my_restaurant
+ ┃ ┃ ┣ 📜default_restaurant.json
+ ┃ ┃ ┗ 📜small_cafe.json
+ ┃ ┗ 📂rag_knowledge
+ ┃ ┃ ┗ 📜restaurant_rule.json
+ ┣ 📂restaurant
+ ┃ ┣ 📂__pycache__
+ ┃ ┃ ┣ 📜restaurant.cpython-311.pyc
+ ┃ ┃ ┣ 📜restaurant_layout.cpython-311.pyc
+ ┃ ┃ ┗ 📜__init__.cpython-311.pyc
+ ┃ ┣ 📜README.md
+ ┃ ┣ 📜restaurant.py
+ ┃ ┣ 📜restaurant_layout.py
+ ┃ ┗ 📜__init__.py
+ ┣ 📂robot
+ ┃ ┣ 📂rag
+ ┃ ┃ ┣ 📂__pycache__
+ ┃ ┃ ┃ ┣ 📜knowledge_base.cpython-311.pyc
+ ┃ ┃ ┃ ┣ 📜llm_client.cpython-311.pyc
+ ┃ ┃ ┃ ┣ 📜prompt_helper.cpython-311.pyc
+ ┃ ┃ ┃ ┣ 📜rag_module.cpython-311.pyc
+ ┃ ┃ ┃ ┣ 📜retriever.cpython-311.pyc
+ ┃ ┃ ┃ ┗ 📜__init__.cpython-311.pyc
+ ┃ ┃ ┣ 📜knowledge_base.py
+ ┃ ┃ ┣ 📜llm_client.py
+ ┃ ┃ ┣ 📜prompt_helper.py
+ ┃ ┃ ┣ 📜rag_module.py
+ ┃ ┃ ┣ 📜README.md
+ ┃ ┃ ┣ 📜retriever.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂__pycache__
+ ┃ ┃ ┣ 📜motion_controller.cpython-311.pyc
+ ┃ ┃ ┣ 📜planner.cpython-311.pyc
+ ┃ ┃ ┣ 📜robot.cpython-311.pyc
+ ┃ ┃ ┗ 📜__init__.cpython-311.pyc
+ ┃ ┣ 📜motion_controller.py
+ ┃ ┣ 📜planner.py
+ ┃ ┣ 📜README.md
+ ┃ ┣ 📜robot.py
+ ┃ ┗ 📜__init__.py
+ ┣ 📂visualization
+ ┃ ┣ 📂__pycache__
+ ┃ ┃ ┣ 📜visualization.cpython-311.pyc
+ ┃ ┃ ┗ 📜__init__.cpython-311.pyc
+ ┃ ┣ 📜README.md
+ ┃ ┣ 📜visualization.py
+ ┃ ┗ 📜__init__.py
+ ┣ 📂__pycache__
+ ┃ ┗ 📜main_runner.cpython-311.pyc
+ ┣ 📜.env
+ ┣ 📜.gitignore
+ ┣ 📜main.py
+ ┣ 📜main_runner.py
+ ┣ 📜README.md
+ ┗ 📜__init__.py
+
+
+
+ 未来如何让 RAG 决策影响规划层？
+AIEnhancedRobot 已把 RAGModule 注入 MotionController。
+
+MotionController.step() 在遇障碍时会调用 rag.obstacle_decision()，
+决策字符串 → “reroute / wait / report_unreachable”。
+
+reroute 会重新调用 PathPlanner.find_path()，直接影响路径；
+其余两种决定动作。
+
+你只需在 PromptHelper.simplify(...) 里保证解析出的关键字
+与 MotionController 的判断保持一致即可扩展更多决策。
+
+这样 main_runner.py 不需知道 RAG 细节，聚焦交互即可。
+有更多场景（如“桌子选择”“拥堵回避”）时，只扩展 rag/ 与 MotionController 层，
+主流程无需改动。
