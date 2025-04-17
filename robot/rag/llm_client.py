@@ -4,14 +4,14 @@ OpenAI API（嵌入 + ChatCompletion）
 
 from __future__ import annotations
 
-import logging
+import os
+import dotenv
 from typing import List
 
 import numpy as np
 from openai import OpenAI
 
-logger = logging.getLogger(__name__)
-
+dotenv.load_dotenv()
 
 class LLMClient:
     """
@@ -19,7 +19,7 @@ class LLMClient:
     """
 
     def __init__(self, api_key: str | None = None) -> None:
-        self.api_key = api_key
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise RuntimeError("OPENAI_API_KEY not provided")
         self.client = OpenAI(api_key=self.api_key)
