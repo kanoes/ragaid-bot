@@ -57,12 +57,47 @@ pip install numpy matplotlib faiss-cpu openai python-dotenv
 
 ## 快速开始
 
+### 1. CLI 模式（本地运行）
+
+确保已安装 Python 3.10+ 并配置好环境变量（如 `OPENAI_API_KEY`）：
+
+首先安装需要的插件
+
 ```bash
-# 交互 CLI
+pip install -r requirements.txt
+```
+
+直接运行main文件
+
+```bash
 python main.py
 ```
 
-交互流程：选择餐厅 → 选择是否使用 RAG 机器人 → 指定订单数量 → 动画展示 / 性能统计。
+---
+
+### 2. Docker 模式（一键运行）
+
+无需本地 Python 环境，只需安装 Docker。
+
+1. **安装 Docker**
+
+   - **Windows / macOS**  
+     下载并安装 [Docker Desktop](https://www.docker.com/products/docker-desktop) 
+
+2. **构建DockerImage**
+
+   在项目根目录执行：
+
+   ```bash
+   docker-compose up --build
+   ```
+
+   - 第一次会拉取基础镜像并构建，后续构建速度极快。  
+
+3. **运行**
+
+   访问 http://localhost:8501 即可打开 Web 界面。
+
 
 ---
 

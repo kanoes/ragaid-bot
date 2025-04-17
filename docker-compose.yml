@@ -1,0 +1,8 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8501:8501"
+    # 自动加载同级 .env 文件中的环境变量
+    env_file:
+      - .env

@@ -1,0 +1,7 @@
+streamlit
+numpy
+matplotlib
+faiss-cpu
+openai
+python-dotenv
+pillow
