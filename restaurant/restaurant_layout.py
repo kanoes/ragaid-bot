@@ -16,9 +16,7 @@ from __future__ import annotations
 from typing import List, Tuple, Dict, Optional
 
 
-# ---------------------------------------------------------------------------- #
-# 核心类
-# ---------------------------------------------------------------------------- #
+
 class RestaurantLayout:
     """二维网格的餐厅布局。"""
 
@@ -43,7 +41,6 @@ class RestaurantLayout:
         self.kitchen: List[Tuple[int, int]] = kitchen_positions or []
         self.parking: Optional[Tuple[int, int]] = parking_position
 
-    # ----- 基础查询 ---------------------------------------------------------- #
     def is_free(self, pos: Tuple[int, int]) -> bool:
         """位置是否可通行（空地 / 厨房 / 停靠点）。"""
         x, y = pos
@@ -59,7 +56,6 @@ class RestaurantLayout:
         cand = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
         return [p for p in cand if self.is_free(p)]
         
-    # ----- 显示布局 ---------------------------------------------------------- #
     @staticmethod
     def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
         """

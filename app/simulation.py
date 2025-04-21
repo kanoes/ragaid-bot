@@ -46,15 +46,15 @@ class SimulationEngine:
                 logger.info(f"订单 #{order.order_id} 分配到 Robot#{bot.robot_id}")
                 bot.simulate()
                 
-            #     # 可视化路径
-            #     animate_robot_path(
-            #         bot.path_history,
-            #         title=f"Robot#{bot.robot_id} Order#{order.order_id}",
-            #         fps=4,
-            #     )
-            #     self.stats["delivered"] += 1
-            # else:
-            #     logger.error(f"订单 #{order.order_id} 无法配送")
-            #     self.stats["failed"] += 1
+                # 可视化路径
+                # animate_robot_path(
+                #     bot.path_history,
+                #     title=f"Robot#{bot.robot_id} Order#{order.order_id}",
+                #     fps=4,
+                # )
+                self.stats["delivered"] += 1
+            else:
+                logger.error(f"订单 #{order.order_id} 无法配送")
+                self.stats["failed"] += 1
                 
         return self.stats 

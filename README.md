@@ -99,7 +99,7 @@ streamlit run app.py
 ### Docker 模式
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 然后访问 http://localhost:8501

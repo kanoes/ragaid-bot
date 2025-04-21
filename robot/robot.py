@@ -49,27 +49,6 @@ class Robot:
         self._stats = {"delivered": 0, "failed": 0}
         self.path_history: list[tuple[int, int]] = [self.position]
     
-    # ---------------- 移动记录 ---------------- #
-    def tick(self) -> None:
-        if not self.path:
-            return
-
-        prev_pos = self.position
-        self.position, self.path = self.controller.step(
-            self.position, self.path, self.goal
-        )
-
-        if self.position != prev_pos:
-            self.path_history.append(self.position)
-
-        if self.position == self.goal:
-            self._finish_delivery(success=True)
-
-    def _finish_delivery(self, *, success: bool) -> None:
-        ...
-        # 保留 path_history；在接新订单时重置
-        self.path = []
-
     # ---------------- 订单接口 ---------------- #
     def assign_order(self, order: Order) -> bool:
         """

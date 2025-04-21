@@ -130,6 +130,89 @@ def load_restaurant(layout_name, layout_dir=LAYOUT_DIR):
     cfg = RestaurantLayout.parse_layout_from_strings(layout_name, data["layout"])
     return Restaurant(data.get("name", layout_name), RestaurantLayout(**cfg))
 
+def save_restaurant_layout(layout_data, layout_dir=LAYOUT_DIR):
+    """
+    保存餐厅布局到JSON文件
+    
+    Args:
+        layout_data: dict, 包含布局数据
+        layout_dir: 保存目录路径
+    
+    Returns:
+        str: 保存文件的路径
+    """
+    # 确保目录存在
+    os.makedirs(layout_dir, exist_ok=True)
+    
+    # 准备数据
+    name = layout_data.get("name", "新布局")
+    safe_name = name.replace(" ", "_").lower()
+    
+    # 将网格数据转换为字符串表示
+    grid = layout_data.get("grid", [])
+    table_positions = layout_data.get("table_positions", {})
+    kitchen_positions = layout_data.get("kitchen_positions", [])
+    parking_position = layout_data.get("parking_position")
+    
+    # 创建字符表示
+    layout_strings = []
+    height = len(grid)
+    width = len(grid[0]) if height > 0 else 0
+    
+    # 反向查找表
+    pos_to_table = {pos: tid for tid, pos in table_positions.items()}
+    
+    for i in range(height):
+        row = []
+        for j in range(width):
+            pos = (i, j)
+            cell_type = grid[i][j]
+            
+            if cell_type == 1:  # 墙
+                row.append("#")
+            elif cell_type == 0:  # 空地
+                row.append("*")
+            elif cell_type == 2 and pos in pos_to_table:  # 桌子
+                row.append(pos_to_table[pos])
+            elif cell_type == 3:  # 厨房
+                row.append("台")
+            elif cell_type == 4:  # 停靠点
+                row.append("停")
+            else:
+                row.append("*")  # 默认空地
+        
+        layout_strings.append(" ".join(row))
+    
+    # 准备保存的数据
+    save_data = {
+        "name": name,
+        "layout": layout_strings
+    }
+    
+    # 保存到文件
+    file_path = os.path.join(layout_dir, f"{safe_name}.json")
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(save_data, f, ensure_ascii=False, indent=2)
+    
+    return file_path
+
+def delete_restaurant_layout(layout_name, layout_dir=LAYOUT_DIR):
+    """
+    删除餐厅布局文件
+    
+    Args:
+        layout_name: 布局名称
+        layout_dir: 布局文件目录
+    
+    Returns:
+        bool: 是否成功删除
+    """
+    file_path = os.path.join(layout_dir, f"{layout_name}.json")
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        return True
+    return False
+
 def build_robot(use_ai, layout):
     """构建机器人实例"""
     if use_ai:
