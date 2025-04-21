@@ -58,126 +58,61 @@ class RestaurantLayout:
         x, y = pos
         cand = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
         return [p for p in cand if self.is_free(p)]
-
-    # ----- 信息接口 ---------------------------------------------------------- #
-    def print_info(self) -> None:
-        """打印尺寸、桌子/厨房/停靠点统计。"""
-        print("===== 布局信息 =====")
-        print(f"尺寸: {self.width} × {self.height}")
-        print(f"桌子数量: {len(self.tables)}")
-        print(f"厨房数量: {len(self.kitchen)}")
-        if self.parking:
-            print(f"停靠点: {self.parking}")
-
-    # ----- 显示 -------------------------------------------------------------- #
-    def display(
-        self,
-        restaurant_name: str = "餐厅",
-        path: Optional[List[Tuple[int, int]]] = None,
-        robot_position: Optional[Tuple[int, int]] = None,
-    ) -> None:
-        """打印 ASCII 网格，可选路径与机器人位置。"""
-        print(f"\n===== {restaurant_name} =====")
-        vis = [["." for _ in range(self.width)] for _ in range(self.height)]
-
-        # 基础填充
-        for i in range(self.height):
-            for j in range(self.width):
-                cell = self.grid[i][j]
-                if cell == 1:
-                    vis[i][j] = "#"
-                elif cell == 3:
-                    vis[i][j] = "K"
-                elif cell == 4:
-                    vis[i][j] = "P"
-
-        # 桌子
-        for tid, (r, c) in self.tables.items():
-            vis[r][c] = tid
-
-        # 路径
-        if path:
-            for r, c in path:
-                if vis[r][c] == ".":
-                    vis[r][c] = "*"
-
-        # 机器人
-        if robot_position:
-            r, c = robot_position
-            vis[r][c] = "R"
-
-        # 输出
-        print("+" + "-" * (self.width * 2 + 1) + "+")
-        for row in vis:
-            print("| " + " ".join(row) + " |")
-        print("+" + "-" * (self.width * 2 + 1) + "+")
-
-    def display_full(self, highlight: Optional[Tuple[int, int]] = None) -> None:
-        """
-        带坐标的详细输出，用于调试
-        """
-        header = "    " + " ".join(f"{j:2d}" for j in range(self.width))
-        print(header)
-        print("   " + "-" * (self.width * 3))
-        for i in range(self.height):
-            line = f"{i:2d}|"
-            for j in range(self.width):
-                char = "."
-                if self.grid[i][j] == 1:
-                    char = "#"
-                elif self.grid[i][j] == 3:
-                    char = "K"
-                elif self.grid[i][j] == 4:
-                    char = "P"
-                for tid, pos in self.tables.items():
-                    if pos == (i, j):
-                        char = tid
-                        break
-                if highlight and (i, j) == highlight:
-                    char = "*"
-                line += f" {char} "
-            print(line)
-
-    # --------------------------------------------------------------------- #
-    # 静态方法：解析 / 导出
-    # --------------------------------------------------------------------- #
+        
+    # ----- 显示布局 ---------------------------------------------------------- #
     @staticmethod
-    def parse_layout_from_strings(
-        name: str, lines: List[str]
-    ) -> Dict[str, object]:
+    def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
         """
-        将字符串列表解析成布局配置字典
-        每行需用空格分隔 token，支持符号见模块说明
+        从字符串数组解析餐厅布局
+        
+        Args:
+            layout_name: 布局名称
+            layout_lines: 布局字符串数组
+            
+        Returns:
+            dict: 包含解析后的布局配置
         """
-        tokens = [ln.split() for ln in lines]
-        height = len(tokens)
-        width = max(len(row) for row in tokens) if height else 0
-
+        # 字符到数值的映射
+        char_map = {
+            "#": 1, "＃": 1, "W": 1,    # 墙壁/障碍
+            "*": 0, ".": 0,             # 空地
+            "台": 3,                    # 厨房
+            "停": 4, "P": 4             # 停靠点
+        }
+        
+        # 初始化数据结构
+        height = len(layout_lines)
+        width = max(len(line.split()) for line in layout_lines) if height else 0
         grid = [[0] * width for _ in range(height)]
-        table_pos: Dict[str, Tuple[int, int]] = {}
-        kitchen_pos: List[Tuple[int, int]] = []
-        parking_pos: Optional[Tuple[int, int]] = None
-
-        for i, row in enumerate(tokens):
-            for j, tk in enumerate(row):
-                if tk == "#":
-                    grid[i][j] = 1
-                elif tk in {".", "*"}:
-                    grid[i][j] = 0
-                elif tk == "台":
-                    grid[i][j] = 3
-                    kitchen_pos.append((i, j))
-                elif tk == "停":
-                    grid[i][j] = 4
-                    if parking_pos is None:
-                        parking_pos = (i, j)
-                elif tk.isalpha():  # 桌子
-                    grid[i][j] = 2
-                    table_pos[tk] = (i, j)
-
+        table_positions = {}
+        kitchen_positions = []
+        parking_position = None
+        
+        # 解析布局字符串
+        for row, line in enumerate(layout_lines):
+            tokens = line.split()
+            for col, token in enumerate(tokens):
+                if token in char_map:
+                    # 已知符号
+                    value = char_map[token]
+                    grid[row][col] = value
+                    
+                    # 特殊位置记录
+                    if value == 3:  # 厨房
+                        kitchen_positions.append((row, col))
+                    elif value == 4:  # 停靠点
+                        parking_position = (row, col)
+                elif token.isalpha() and len(token) == 1:
+                    # 桌子
+                    grid[row][col] = 2
+                    table_positions[token] = (row, col)
+                else:
+                    # 未知符号，当作空地处理
+                    grid[row][col] = 0
+        
         return {
             "grid": grid,
-            "table_positions": table_pos,
-            "kitchen_positions": kitchen_pos,
-            "parking_position": parking_pos,
+            "table_positions": table_positions,
+            "kitchen_positions": kitchen_positions,
+            "parking_position": parking_position
         }

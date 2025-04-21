@@ -3,9 +3,10 @@
 
 分层架构
 --------
-* PathPlanner / OrderManager   — 规划层（robot.planner）
-* MotionController             — 动作层（robot.motion_controller）
-* Robot / AIEnhancedRobot      — 调度层（本文件）
+* PathPlanner             — 规划层（robot.path_planner）
+* Order / OrderManager    — 订单层（robot.order）
+* MotionController        — 动作层（robot.motion_controller）
+* Robot / AIEnhancedRobot — 调度层（本文件）
 """
 
 from __future__ import annotations
@@ -16,7 +17,8 @@ from typing import List, Optional, Tuple
 
 from restaurant.restaurant_layout import RestaurantLayout
 from robot.motion_controller import MotionController
-from robot.planner import Order, PathPlanner
+from robot.plan import PathPlanner
+from robot.order import Order
 from robot.rag import RAGModule
 
 logger = logging.getLogger(__name__)

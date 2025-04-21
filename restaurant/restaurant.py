@@ -25,26 +25,6 @@ class Restaurant:
         self.name: str = name
         self.layout: RestaurantLayout = layout
 
-    # --------------------------------------------------------------------- #
-    # 便利方法：全部委托给 layout
-    # --------------------------------------------------------------------- #
-    def display(self, *args, **kwargs) -> None:
-        """
-        简易展示布局网格
-        """
-        self.layout.display(*args, **kwargs)
-
-    def display_full(self, *args, **kwargs) -> None:
-        """
-        带坐标的详细展示
-        """
-        self.layout.display_full(*args, **kwargs)
-
-    def print_info(self) -> None:
-        """
-        打印布局基础信息
-        """
-        self.layout.print_info()
 
     # --------------------------------------------------------------------- #
     # 魔术方法

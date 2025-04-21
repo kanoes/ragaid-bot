@@ -13,7 +13,7 @@ import time
 from typing import List, Optional, Tuple
 
 from restaurant.restaurant_layout import RestaurantLayout
-from robot.planner import PathPlanner
+from robot.plan import PathPlanner
 from robot.rag.rag_module import RAGModule
 
 logger = logging.getLogger(__name__)
