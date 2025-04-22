@@ -1,4 +1,5 @@
-"""RestaurantLayout – 餐厅平面图数据结构。
+"""
+RestaurantLayout – 餐厅平面图数据结构。
 
 标记约定
 --------
@@ -16,9 +17,10 @@ from __future__ import annotations
 from typing import List, Tuple, Dict, Optional
 
 
-
 class RestaurantLayout:
-    """二维网格的餐厅布局。"""
+    """
+    二维网格的餐厅布局
+    """
 
     # ----- 构造 -------------------------------------------------------------- #
     def __init__(
@@ -42,40 +44,46 @@ class RestaurantLayout:
         self.parking: Optional[Tuple[int, int]] = parking_position
 
     def is_free(self, pos: Tuple[int, int]) -> bool:
-        """位置是否可通行（空地 / 厨房 / 停靠点）。"""
+        """
+        位置是否可通行（空地 / 厨房 / 停靠点）
+        """
         x, y = pos
         return (
-            0 <= x < self.height
-            and 0 <= y < self.width
-            and self.grid[x][y] in (0, 4)
+            0 <= x < self.height and 0 <= y < self.width and self.grid[x][y] in (0, 4)
         )
 
     def neighbors(self, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
-        """返回上下左右可通行的相邻位置。"""
+        """
+        返回上下左右可通行的相邻位置
+        """
         x, y = pos
         cand = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
         return [p for p in cand if self.is_free(p)]
-        
+
     @staticmethod
     def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
         """
         从字符串数组解析餐厅布局
-        
+
         Args:
             layout_name: 布局名称
             layout_lines: 布局字符串数组
-            
+
         Returns:
             dict: 包含解析后的布局配置
         """
         # 字符到数值的映射
         char_map = {
-            "#": 1, "＃": 1, "W": 1,    # 墙壁/障碍
-            "*": 0, ".": 0,             # 空地
-            "台": 3,                    # 厨房
-            "停": 4, "P": 4             # 停靠点
+            "#": 1,
+            "＃": 1,
+            "W": 1,  # 墙壁/障碍
+            "*": 0,
+            ".": 0,  # 空地
+            "台": 3,  # 厨房
+            "停": 4,
+            "P": 4,  # 停靠点
         }
-        
+
         # 初始化数据结构
         height = len(layout_lines)
         width = max(len(line.split()) for line in layout_lines) if height else 0
@@ -83,7 +91,7 @@ class RestaurantLayout:
         table_positions = {}
         kitchen_positions = []
         parking_position = None
-        
+
         # 解析布局字符串
         for row, line in enumerate(layout_lines):
             tokens = line.split()
@@ -92,7 +100,7 @@ class RestaurantLayout:
                     # 已知符号
                     value = char_map[token]
                     grid[row][col] = value
-                    
+
                     # 特殊位置记录
                     if value == 3:  # 厨房
                         kitchen_positions.append((row, col))
@@ -105,10 +113,10 @@ class RestaurantLayout:
                 else:
                     # 未知符号，当作空地处理
                     grid[row][col] = 0
-        
+
         return {
             "grid": grid,
             "table_positions": table_positions,
             "kitchen_positions": kitchen_positions,
-            "parking_position": parking_position
+            "parking_position": parking_position,
         }

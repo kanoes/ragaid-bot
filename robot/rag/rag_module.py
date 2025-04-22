@@ -57,7 +57,9 @@ class RAGModule:
         query = PromptHelper.build_obstacle_query(robot_id, position, goal, obstacle)
 
         # 检索知识
-        know: List[str] = self.retriever.retrieve(query, self.top_k) if self.retriever else []
+        know: List[str] = (
+            self.retriever.retrieve(query, self.top_k) if self.retriever else []
+        )
 
         system_prompt = (
             "You are an intelligent delivery‑robot assistant. "
@@ -67,5 +69,7 @@ class RAGModule:
         knowledge_block = "\n".join(f"- {k}" for k in know)
         user_prompt = f"{query}\n\nKnowledge:\n{knowledge_block}" if know else query
 
-        raw_decision = self.llm.chat(system_prompt, user_prompt, temperature=0.0, max_tokens=16)
+        raw_decision = self.llm.chat(
+            system_prompt, user_prompt, temperature=0.0, max_tokens=16
+        )
         return PromptHelper.simplify(raw_decision)

@@ -3,10 +3,8 @@
 """
 import os
 import json
-from io import StringIO
-from typing import Dict, Tuple, Optional, Any, List
+from typing import Tuple, Optional, List
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.box import ROUNDED
@@ -21,7 +19,9 @@ from .constants import LAYOUT_DIR, RAG_KB_DIR, EMPTY_STYLE, WALL_STYLE, TABLE_ST
 
 
 def available_layouts(layout_dir=LAYOUT_DIR):
-    """获取可用的餐厅布局列表"""
+    """
+    获取可用的餐厅布局列表
+    """
     return sorted(os.path.splitext(f)[0] for f in os.listdir(layout_dir) if f.endswith(".json"))
 
 def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
@@ -121,7 +121,9 @@ def display_restaurant_ascii(restaurant, restaurant_name=None):
     print("-" * (layout.width * 2 + 3))
 
 def load_restaurant(layout_name, layout_dir=LAYOUT_DIR):
-    """加载餐厅布局"""
+    """
+    加载餐厅布局
+    """
     json_path = os.path.join(layout_dir, f"{layout_name}.json")
     with open(json_path, encoding="utf-8") as fp:
         data = json.load(fp)
@@ -214,13 +216,17 @@ def delete_restaurant_layout(layout_name, layout_dir=LAYOUT_DIR):
     return False
 
 def build_robot(use_ai, layout):
-    """构建机器人实例"""
+    """
+    构建机器人实例
+    """
     if use_ai:
         return AIEnhancedRobot(layout, robot_id=1, knowledge_dir=RAG_KB_DIR)
     return Robot(layout, robot_id=1)
 
 def make_order(seq, table_id):
-    """创建订单实例"""
+    """
+    创建订单实例
+    """
     return Order(order_id=seq, table_id=table_id, prep_time=0)
 
 def create_rich_layout(grid, height, width, tables, 
@@ -296,7 +302,9 @@ def create_rich_layout(grid, height, width, tables,
     return layout_text
 
 def get_table_id(pos, tables):
-    """获取特定位置对应的桌子ID"""
+    """
+    获取特定位置对应的桌子ID
+    """
     # 通过位置反查桌子ID
     for tid, tpos in tables.items():
         if tpos == pos:

@@ -6,7 +6,9 @@ from __future__ import annotations
 
 
 class PromptHelper:
-    """构造与解析 Prompt"""
+    """
+    构造与解析 Prompt
+    """
 
     @staticmethod
     def build_obstacle_query(robot_id: int, position, goal, obstacle) -> str:

@@ -1,13 +1,13 @@
 """
 Streamlit Web App 主页面逻辑
 """
+
 import gc
 import streamlit as st
 from .constants import logger
 from .utils import available_layouts
 from .ui import (
     setup_page,
-    render_restaurant_layout,
     render_stats,
     render_plotly_restaurant_layout,
     render_layout_editor,
@@ -34,6 +34,7 @@ from .state import (
     set_path_histories,
 )
 
+
 def run():
     """
     运行Streamlit应用
@@ -41,26 +42,26 @@ def run():
     # 配置页面和性能优化
     setup_page()
     init_session_state()
-    
+
     # 性能优化：限制Plotly渲染过程中的内存消耗
     if "plotly_performance_tuned" not in st.session_state:
         st.session_state["plotly_performance_tuned"] = True
         # 强制垃圾回收
         gc.collect()
-        
+
     # 性能优化：使用内存效率更高的绘图设置
     if "performance_config" not in st.session_state:
         st.session_state["performance_config"] = {
             "max_points_per_chart": 1000,  # 限制每个图表的最大点数
-            "use_webgl": True,             # 使用WebGL渲染（如果浏览器支持）
-            "batch_size": 10               # 批处理大小
+            "use_webgl": True,  # 使用WebGL渲染（如果浏览器支持）
+            "batch_size": 10,  # 批处理大小
         }
 
     # 获取可用布局
     layouts = available_layouts()
 
     # --- Sidebar 布局选择 & 参数 ---
-    # 先渲染布局下拉框，确保后续依赖它的控件拿到最新的 restaurant
+    # 渲染布局下拉框，确保后续依赖它的控件拿到最新的 restaurant
     if layouts:
         selected_layout = st.sidebar.selectbox(
             "选择餐厅布局", layouts, key="layout_select"
@@ -77,7 +78,9 @@ def run():
 
     # 其他 sidebar 控件
     use_ai = st.sidebar.checkbox("使用 RAG 智能机器人", value=False, key="use_ai")
-    num_tables = len(restaurant.layout.tables) if (restaurant and restaurant.layout) else 1
+    num_tables = (
+        len(restaurant.layout.tables) if (restaurant and restaurant.layout) else 1
+    )
     num_orders = st.sidebar.slider(
         "订单数量", 1, max(1, num_tables), 1, key="num_orders"
     )
@@ -102,15 +105,22 @@ def run():
         if path_histories and restaurant:
             st.subheader("配送路径可视化")
             # 创建选择框以选择要显示的路径
-            options = [f"订单 #{ph['order_id']} (桌子 {ph['table_id']})" for ph in path_histories]
-            selected_path_idx = st.selectbox("选择要查看的配送路径", range(len(options)), format_func=lambda i: options[i])
-            
+            options = [
+                f"订单 #{ph['order_id']} (桌子 {ph['table_id']})"
+                for ph in path_histories
+            ]
+            selected_path_idx = st.selectbox(
+                "选择要查看的配送路径",
+                range(len(options)),
+                format_func=lambda i: options[i],
+            )
+
             # 显示选择的路径
             selected_path = path_histories[selected_path_idx]
             render_plotly_robot_path(
-                restaurant, 
+                restaurant,
                 selected_path["path"],
-                title=f"机器人 #{selected_path['robot_id']} 送餐至桌子 {selected_path['table_id']}"
+                title=f"机器人 #{selected_path['robot_id']} 送餐至桌子 {selected_path['table_id']}",
             )
 
     with tab2:
@@ -119,10 +129,10 @@ def run():
         if stats:
             # 基本统计
             render_stats(stats)
-            
+
             # Plotly统计可视化
             render_plotly_stats(stats)
-            
+
             # 扩展统计分析
             render_plotly_stats_extended(stats)
 
@@ -152,7 +162,9 @@ def run():
 
         # 加载或创建新布局
         if layout_to_edit != "创建新布局" and not is_editor_loaded():
-            load_layout_to_editor(layout_to_edit)
+            # 加载已有布局对象到编辑器
+            restaurant_to_edit = handle_layout_selection(layout_to_edit)
+            load_layout_to_editor(restaurant_to_edit)
             set_editor_loaded(True)
         elif layout_to_edit == "创建新布局" and is_editor_loaded():
             set_editor_loaded(False)
@@ -174,9 +186,10 @@ def run():
             st.write("")
             st.write("")
             if st.button("保存布局", key="save_layout") and layout_name and new_layout:
-                if handle_layout_save(layout_name, new_layout):
+                # 更新布局名称并保存到同一目录
+                new_layout["name"] = layout_name
+                saved_restaurant = handle_layout_save(new_layout)
+                if saved_restaurant:
                     st.success(f"已保存布局: {layout_name}")
-                    # 如果当前没有选择餐厅，则自动选择新保存的
-                    if not restaurant:
-                        restaurant = handle_layout_selection(layout_name)
-                        set_restaurant(restaurant)
+                    # 自动将新布局设为当前餐厅
+                    set_restaurant(saved_restaurant)

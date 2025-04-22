@@ -48,14 +48,14 @@ class Robot:
         self.current_order: Optional[Order] = None
         self._stats = {"delivered": 0, "failed": 0}
         self.path_history: list[tuple[int, int]] = [self.position]
-    
+
     # ---------------- 订单接口 ---------------- #
     def assign_order(self, order: Order) -> bool:
         """
         接单并规划路径
         """
         if self.current_order:
-            self.path_history = [self.position] 
+            self.path_history = [self.position]
             logger.info("Robot #%s 忙碌", self.robot_id)
             return False
 
@@ -85,7 +85,7 @@ class Robot:
 
     # ---------------- 模拟循环 ---------------- #
     def tick(self) -> None:
-        if not self.path:           # 没有剩余路径，不动
+        if not self.path:  # 没有剩余路径，不动
             return
 
         prev = self.position
@@ -99,7 +99,6 @@ class Robot:
 
         if self.position == self.goal:
             self._finish_delivery(success=True)
-
 
     def _finish_delivery(self, *, success: bool) -> None:
         if not self.current_order:

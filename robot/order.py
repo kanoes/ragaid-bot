@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import time
 from enum import Enum, auto
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,11 @@ class Order:
 
     # ---- 统计 --------------------------------------------------------------
     def total_time(self) -> Optional[float]:
-        return (self.delivery_end_time or 0) - self.created_time if self.delivery_end_time else None
+        return (
+            (self.delivery_end_time or 0) - self.created_time
+            if self.delivery_end_time
+            else None
+        )
 
     def delivery_time(self) -> Optional[float]:
         if self.delivery_start_time and self.delivery_end_time:
@@ -122,7 +126,9 @@ class OrderManager:
         self.failed: List[Order] = []
 
     # ---- 创建与状态迁移 -----------------------------------------------------
-    def create(self, table_id: str, prep_time: int, items: Optional[List[str]] = None) -> Order:
+    def create(
+        self, table_id: str, prep_time: int, items: Optional[List[str]] = None
+    ) -> Order:
         """
         新建订单并加入 waiting 队列
         """
@@ -147,7 +153,9 @@ class OrderManager:
 
         # 检查准备完成
         finished = [
-            od for od in self.preparing if now - (od.prep_start_time or now) >= od.prep_time
+            od
+            for od in self.preparing
+            if now - (od.prep_start_time or now) >= od.prep_time
         ]
         for od in finished:
             od.finish_preparing()
@@ -155,10 +163,7 @@ class OrderManager:
             logger.debug("订单准备完成 %s", od)
 
         # 启动新准备
-        while (
-            self.waiting
-            and len(self.preparing) < self.MAX_SIMULTANEOUS_PREPARING
-        ):
+        while self.waiting and len(self.preparing) < self.MAX_SIMULTANEOUS_PREPARING:
             od = self.waiting.pop(0)
             od.start_preparing()
             self.preparing.append(od)
@@ -207,15 +212,21 @@ class OrderManager:
         统计订单相关指标
         """
         total = len(self._orders)
-        delivery_times = [od.delivery_time() for od in self.completed if od.delivery_time()]
+        delivery_times = [
+            od.delivery_time() for od in self.completed if od.delivery_time()
+        ]
         total_times = [od.total_time() for od in self.completed if od.total_time()]
         return {
             "total_orders": total,
             "completed": len(self.completed),
             "failed": len(self.failed),
             "success_rate": len(self.completed) / total * 100 if total else 0.0,
-            "avg_delivery_time": sum(delivery_times) / len(delivery_times) if delivery_times else 0.0,
-            "avg_total_time": sum(total_times) / len(total_times) if total_times else 0.0,
+            "avg_delivery_time": (
+                sum(delivery_times) / len(delivery_times) if delivery_times else 0.0
+            ),
+            "avg_total_time": (
+                sum(total_times) / len(total_times) if total_times else 0.0
+            ),
         }
 
     # ---- misc --------------------------------------------------------------
@@ -223,4 +234,4 @@ class OrderManager:
         """
         获取指定订单
         """
-        return self._orders[order_id] 
+        return self._orders[order_id]

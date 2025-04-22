@@ -1,0 +1,36 @@
+"filename", "language", "Python", "Docker", "YAML", "Markdown", "pip requirements", "JSON", "comment", "blank", "total"
+"c:\Users\tanak\Desktop\ragaid-bot\Dockerfile", "Docker", 0, 17, 0, 0, 0, 0, 11, 11, 39
+"c:\Users\tanak\Desktop\ragaid-bot\README.md", "Markdown", 0, 0, 0, 114, 0, 0, 0, 33, 147
+"c:\Users\tanak\Desktop\ragaid-bot\__init__.py", "Python", 16, 0, 0, 0, 0, 0, 2, 4, 22
+"c:\Users\tanak\Desktop\ragaid-bot\app.py", "Python", 6, 0, 0, 0, 0, 0, 0, 2, 8
+"c:\Users\tanak\Desktop\ragaid-bot\app\__init__.py", "Python", 10, 0, 0, 0, 0, 0, 0, 2, 12
+"c:\Users\tanak\Desktop\ragaid-bot\app\constants.py", "Python", 17, 0, 0, 0, 0, 0, 3, 6, 26
+"c:\Users\tanak\Desktop\ragaid-bot\app\handlers.py", "Python", 48, 0, 0, 0, 0, 0, 5, 18, 71
+"c:\Users\tanak\Desktop\ragaid-bot\app\main.py", "Python", 145, 0, 0, 0, 0, 0, 27, 24, 196
+"c:\Users\tanak\Desktop\ragaid-bot\app\simulation.py", "Python", 61, 0, 0, 0, 0, 0, 6, 18, 85
+"c:\Users\tanak\Desktop\ragaid-bot\app\state.py", "Python", 176, 0, 0, 0, 0, 0, 2, 64, 242
+"c:\Users\tanak\Desktop\ragaid-bot\app\ui.py", "Python", 855, 0, 0, 0, 0, 0, 90, 169, 1114
+"c:\Users\tanak\Desktop\ragaid-bot\app\utils.py", "Python", 259, 0, 0, 0, 0, 0, 31, 58, 348
+"c:\Users\tanak\Desktop\ragaid-bot\docker-compose.yml", "YAML", 0, 0, 7, 0, 0, 0, 1, 1, 9
+"c:\Users\tanak\Desktop\ragaid-bot\requirements.txt", "pip requirements", 0, 0, 0, 0, 10, 0, 0, 1, 11
+"c:\Users\tanak\Desktop\ragaid-bot\resources\my_restaurant\default_restaurant.json", "JSON", 0, 0, 0, 0, 0, 15, 0, 0, 15
+"c:\Users\tanak\Desktop\ragaid-bot\resources\my_restaurant\small_cafe.json", "JSON", 0, 0, 0, 0, 0, 12, 0, 0, 12
+"c:\Users\tanak\Desktop\ragaid-bot\resources\rag_knowledge\restaurant_rule.json", "JSON", 0, 0, 0, 0, 0, 10, 0, 0, 10
+"c:\Users\tanak\Desktop\ragaid-bot\restaurant\README.md", "Markdown", 0, 0, 0, 79, 0, 0, 0, 29, 108
+"c:\Users\tanak\Desktop\ragaid-bot\restaurant\__init__.py", "Python", 3, 0, 0, 0, 0, 0, 0, 2, 5
+"c:\Users\tanak\Desktop\ragaid-bot\restaurant\restaurant.py", "Python", 23, 0, 0, 0, 0, 0, 3, 8, 34
+"c:\Users\tanak\Desktop\ragaid-bot\restaurant\restaurant_layout.py", "Python", 89, 0, 0, 0, 0, 0, 8, 18, 115
+"c:\Users\tanak\Desktop\ragaid-bot\robot\README.md", "Markdown", 0, 0, 0, 90, 0, 0, 0, 32, 122
+"c:\Users\tanak\Desktop\ragaid-bot\robot\__init__.py", "Python", 13, 0, 0, 0, 0, 0, 3, 4, 20
+"c:\Users\tanak\Desktop\ragaid-bot\robot\motion_controller.py", "Python", 70, 0, 0, 0, 0, 0, 8, 14, 92
+"c:\Users\tanak\Desktop\ragaid-bot\robot\order.py", "Python", 172, 0, 0, 0, 0, 0, 18, 36, 226
+"c:\Users\tanak\Desktop\ragaid-bot\robot\plan.py", "Python", 88, 0, 0, 0, 0, 0, 6, 18, 112
+"c:\Users\tanak\Desktop\ragaid-bot\robot\rag\README.md", "Markdown", 0, 0, 0, 89, 0, 0, 0, 32, 121
+"c:\Users\tanak\Desktop\ragaid-bot\robot\rag\__init__.py", "Python", 2, 0, 0, 0, 0, 0, 0, 2, 4
+"c:\Users\tanak\Desktop\ragaid-bot\robot\rag\knowledge_base.py", "Python", 60, 0, 0, 0, 0, 0, 0, 13, 73
+"c:\Users\tanak\Desktop\ragaid-bot\robot\rag\llm_client.py", "Python", 40, 0, 0, 0, 0, 0, 0, 9, 49
+"c:\Users\tanak\Desktop\ragaid-bot\robot\rag\prompt_helper.py", "Python", 23, 0, 0, 0, 0, 0, 0, 6, 29
+"c:\Users\tanak\Desktop\ragaid-bot\robot\rag\rag_module.py", "Python", 56, 0, 0, 0, 0, 0, 2, 14, 72
+"c:\Users\tanak\Desktop\ragaid-bot\robot\rag\retriever.py", "Python", 14, 0, 0, 0, 0, 0, 0, 8, 22
+"c:\Users\tanak\Desktop\ragaid-bot\robot\robot.py", "Python", 115, 0, 0, 0, 0, 0, 5, 28, 148
+"Total", "-", 2361, 17, 7, 372, 10, 37, 231, 684, 3719

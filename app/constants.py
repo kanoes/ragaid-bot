@@ -1,9 +1,12 @@
 """
 常量定义
 """
+
 import os
 import logging
+
 from rich.style import Style
+
 # ---------- 配置日志 ----------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,7 +14,7 @@ logger = logging.getLogger(__name__)
 # ---------- 常量 ----------
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 LAYOUT_DIR = os.path.join(BASE_DIR, "resources", "my_restaurant")
-RAG_KB_DIR = os.path.join(BASE_DIR, "resources", "rag_knowledge") 
+RAG_KB_DIR = os.path.join(BASE_DIR, "resources", "rag_knowledge")
 
 # ---------- 餐厅布局样式常量 ----------
 EMPTY_STYLE = Style(bgcolor="black", color="white")
