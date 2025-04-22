@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 # ---------- 常量 ----------
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-LAYOUT_DIR = os.path.join(BASE_DIR, "resources", "my_restaurant")
-RAG_KB_DIR = os.path.join(BASE_DIR, "resources", "rag_knowledge")
+LAYOUT_DIR = os.path.join(BASE_DIR, "restaurant")
+RAG_KB_DIR = os.path.join(BASE_DIR, "robot", "rag", "knowledge")
 
 # ---------- 餐厅布局样式常量 ----------
 EMPTY_STYLE = Style(bgcolor="black", color="white")

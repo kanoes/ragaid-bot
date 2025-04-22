@@ -3,7 +3,7 @@
 """
 import os
 import json
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict, Any
 
 from rich.panel import Panel
 from rich.text import Text
@@ -22,7 +22,21 @@ def available_layouts(layout_dir=LAYOUT_DIR):
     """
     获取可用的餐厅布局列表
     """
-    return sorted(os.path.splitext(f)[0] for f in os.listdir(layout_dir) if f.endswith(".json"))
+    # 检查是否存在新式布局文件
+    new_format_path = os.path.join(layout_dir, "layouts.json")
+    if os.path.exists(new_format_path):
+        try:
+            with open(new_format_path, encoding="utf-8") as f:
+                layouts_data = json.load(f)
+                return [layout["name"] for layout in layouts_data["layouts"]]
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"加载新式布局文件失败: {e}")
+            return []
+    
+    # 回退到旧式布局文件
+    if os.path.exists(layout_dir):
+        return sorted(os.path.splitext(f)[0] for f in os.listdir(layout_dir) if f.endswith(".json") and f != "layouts.json")
+    return []
 
 def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
     """
@@ -91,13 +105,15 @@ def display_restaurant_ascii(restaurant, restaurant_name=None):
     layout = getattr(restaurant, 'layout', restaurant)
     name = restaurant_name or getattr(restaurant, 'name', 'Restaurant')
     
-    # 符号映射
+    # 符号映射（根据数字编码）
     symbols = {
         0: ".",    # 空地
         1: "#",    # 墙/障碍
-        2: "?",    # 桌子（特殊处理）
-        3: "K",    # 厨房
+        2: "?",    # 桌子（将被替换为桌号）
+        3: "?",    # 厨房
         4: "P",    # 停靠点
+        100: "K",  # 厨房（新格式）
+        200: "P",  # 停靠点（新格式）
     }
     
     # 打印标题
@@ -111,11 +127,16 @@ def display_restaurant_ascii(restaurant, restaurant_name=None):
     for i in range(layout.height):
         print("|", end=" ")
         for j in range(layout.width):
-            if layout.grid[i][j] == 2 and (i, j) in rev_tables:
-                # 显示桌子字母
+            cell_value = layout.grid[i][j]
+            if cell_value == 2 and (i, j) in rev_tables:
+                # 显示桌子ID
                 print(rev_tables[(i, j)], end=" ")
+            elif 2 <= cell_value <= 99:
+                # 数字表示的桌子ID（尝试从rev_tables获取，否则显示?）
+                print(rev_tables.get((i, j), "?"), end=" ")
             else:
-                print(symbols.get(layout.grid[i][j], "?"), end=" ")
+                # 其他类型单元格
+                print(symbols.get(cell_value, "?"), end=" ")
         print("|")
     
     print("-" * (layout.width * 2 + 3))
@@ -124,7 +145,27 @@ def load_restaurant(layout_name, layout_dir=LAYOUT_DIR):
     """
     加载餐厅布局
     """
+    # 首先检查新格式文件
+    new_format_path = os.path.join(layout_dir, "layouts.json")
+    if os.path.exists(new_format_path):
+        try:
+            with open(new_format_path, encoding="utf-8") as f:
+                layouts_data = json.load(f)
+                for layout in layouts_data["layouts"]:
+                    if layout["name"] == layout_name:
+                        # 使用新格式解析器
+                        cfg = RestaurantLayout.parse_layout_from_array(
+                            layout_name, layout["grid"]
+                        )
+                        return Restaurant(layout["name"], RestaurantLayout(**cfg))
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"从新格式文件加载布局失败: {e}")
+    
+    # 回退到旧格式
     json_path = os.path.join(layout_dir, f"{layout_name}.json")
+    if not os.path.exists(json_path):
+        raise FileNotFoundError(f"找不到布局文件: {json_path}")
+        
     with open(json_path, encoding="utf-8") as fp:
         data = json.load(fp)
     
@@ -148,51 +189,68 @@ def save_restaurant_layout(layout_data, layout_dir=LAYOUT_DIR):
     
     # 准备数据
     name = layout_data.get("name", "新布局")
-    safe_name = name.replace(" ", "_").lower()
-    
-    # 将网格数据转换为字符串表示
     grid = layout_data.get("grid", [])
-    table_positions = layout_data.get("table_positions", {})
-    kitchen_positions = layout_data.get("kitchen_positions", [])
-    parking_position = layout_data.get("parking_position")
     
-    # 创建字符表示
-    layout_strings = []
-    height = len(grid)
-    width = len(grid[0]) if height > 0 else 0
+    # 检查是否存在layouts.json文件
+    layouts_path = os.path.join(layout_dir, "layouts.json")
+    if os.path.exists(layouts_path):
+        # 加载现有布局
+        try:
+            with open(layouts_path, "r", encoding="utf-8") as f:
+                layouts_data = json.load(f)
+                layouts = layouts_data.get("layouts", [])
+        except Exception:
+            # 如果读取出错，创建新的布局列表
+            layouts = []
+    else:
+        layouts = []
     
-    # 反向查找表
-    pos_to_table = {pos: tid for tid, pos in table_positions.items()}
+    # 查找是否已存在同名布局
+    layout_found = False
+    for i, layout in enumerate(layouts):
+        if layout.get("name") == name:
+            # 更新现有布局
+            layouts[i] = {
+                "name": name,
+                "grid": grid
+            }
+            layout_found = True
+            break
     
-    for i in range(height):
-        row = []
-        for j in range(width):
-            pos = (i, j)
-            cell_type = grid[i][j]
-            
-            if cell_type == 1:  # 墙
-                row.append("#")
-            elif cell_type == 0:  # 空地
-                row.append("*")
-            elif cell_type == 2 and pos in pos_to_table:  # 桌子
-                row.append(pos_to_table[pos])
-            elif cell_type == 3:  # 厨房
-                row.append("台")
-            elif cell_type == 4:  # 停靠点
-                row.append("停")
-            else:
-                row.append("*")  # 默认空地
-        
-        layout_strings.append(" ".join(row))
+    # 如果没有找到布局，添加新的
+    if not layout_found:
+        layouts.append({
+            "name": name,
+            "grid": grid
+        })
+    
+    # 保存到layouts.json
+    with open(layouts_path, "w", encoding="utf-8") as f:
+        json.dump({"layouts": layouts}, f, ensure_ascii=False, indent=2)
+    
+    return layouts_path
+
+def save_layouts_to_single_file(layouts: List[Dict[str, Any]], layout_dir=LAYOUT_DIR):
+    """
+    将多个餐厅布局保存到单一的layouts.json文件
+    
+    Args:
+        layouts: 布局数据列表，每个元素包含name和grid
+        layout_dir: 保存目录路径
+    
+    Returns:
+        str: 保存文件的路径
+    """
+    # 确保目录存在
+    os.makedirs(layout_dir, exist_ok=True)
     
     # 准备保存的数据
     save_data = {
-        "name": name,
-        "layout": layout_strings
+        "layouts": layouts
     }
     
     # 保存到文件
-    file_path = os.path.join(layout_dir, f"{safe_name}.json")
+    file_path = os.path.join(layout_dir, "layouts.json")
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(save_data, f, ensure_ascii=False, indent=2)
     
@@ -209,6 +267,29 @@ def delete_restaurant_layout(layout_name, layout_dir=LAYOUT_DIR):
     Returns:
         bool: 是否成功删除
     """
+    # 检查新格式文件
+    new_format_path = os.path.join(layout_dir, "layouts.json")
+    if os.path.exists(new_format_path):
+        try:
+            with open(new_format_path, "r", encoding="utf-8") as f:
+                layouts_data = json.load(f)
+                
+            # 过滤掉要删除的布局
+            layouts_data["layouts"] = [
+                layout for layout in layouts_data["layouts"]
+                if layout["name"] != layout_name
+            ]
+            
+            # 保存回文件
+            with open(new_format_path, "w", encoding="utf-8") as f:
+                json.dump(layouts_data, f, ensure_ascii=False, indent=2)
+            
+            return True
+        except Exception as e:
+            print(f"从新格式文件删除布局失败: {e}")
+            return False
+    
+    # 回退到旧格式
     file_path = os.path.join(layout_dir, f"{layout_name}.json")
     if os.path.exists(file_path):
         os.remove(file_path)
@@ -220,8 +301,14 @@ def build_robot(use_ai, layout):
     构建机器人实例
     """
     if use_ai:
-        return AIEnhancedRobot(layout, robot_id=1, knowledge_dir=RAG_KB_DIR)
-    return Robot(layout, robot_id=1)
+        robot = AIEnhancedRobot(layout, robot_id=1, knowledge_dir=RAG_KB_DIR)
+    else:
+        robot = Robot(layout, robot_id=1)
+        
+    # 设置机器人的目标容忍参数
+    robot.GOAL_TOLERANCE = 1  # 允许1格的误差范围
+    
+    return robot
 
 def make_order(seq, table_id):
     """

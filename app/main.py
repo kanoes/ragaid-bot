@@ -4,12 +4,14 @@ Streamlit Web App 主页面逻辑
 
 import gc
 import streamlit as st
+import pandas as pd
 from .constants import logger
 from .utils import available_layouts
 from .ui import (
     setup_page,
     render_stats,
     render_plotly_restaurant_layout,
+    render_plotly_restaurant_layout_no_cache,
     render_layout_editor,
     render_plotly_stats,
     render_plotly_robot_path,
@@ -72,9 +74,17 @@ def run():
     # 获取当前餐厅并在切换时立即更新
     restaurant = get_restaurant()
     if selected_layout and (restaurant is None or selected_layout != restaurant.name):
+        # 添加调试日志
+        logger.info(f"当前餐厅: {restaurant.name if restaurant else 'None'}")
+        logger.info(f"选择布局: {selected_layout}")
+        
+        # 加载新布局
         restaurant = handle_layout_selection(selected_layout)
         set_restaurant(restaurant)
-        logger.info(f"加载餐厅布局: {selected_layout}")
+        logger.info(f"加载餐厅布局完成: {restaurant.name}")
+        
+        # 强制刷新页面 - 确保UI更新
+        st.rerun()
 
     # 其他 sidebar 控件
     use_ai = st.sidebar.checkbox("使用 RAG 智能机器人", value=False, key="use_ai")
@@ -92,7 +102,8 @@ def run():
     with tab1:
         # 可视化当前布局
         if restaurant:
-            render_plotly_restaurant_layout(restaurant)
+            # 使用无缓存版本，确保每次都显示最新布局
+            render_plotly_restaurant_layout_no_cache(restaurant)
 
         # 处理模拟
         if sim_button and restaurant:
@@ -104,23 +115,21 @@ def run():
         path_histories = get_path_histories()
         if path_histories and restaurant:
             st.subheader("配送路径可视化")
-            # 创建选择框以选择要显示的路径
-            options = [
-                f"订单 #{ph['order_id']} (桌子 {ph['table_id']})"
-                for ph in path_histories
-            ]
-            selected_path_idx = st.selectbox(
-                "选择要查看的配送路径",
-                range(len(options)),
-                format_func=lambda i: options[i],
-            )
-
-            # 显示选择的路径
-            selected_path = path_histories[selected_path_idx]
+            
+            # 显示所有被分配的订单信息
+            if path_histories[0].get("orders"):
+                orders = path_histories[0]["orders"]
+                st.write(f"**分配的所有订单 ({len(orders)}个):**")
+                order_df = pd.DataFrame(orders)
+                st.dataframe(order_df, use_container_width=True)
+            
+            # 显示路径
+            st.write("**配送路径:**")
             render_plotly_robot_path(
                 restaurant,
-                selected_path["path"],
-                title=f"机器人 #{selected_path['robot_id']} 送餐至桌子 {selected_path['table_id']}",
+                path_histories[0]["path"],
+                robot_orientation=path_histories[0].get("orientation", 90),  # 使用保存的朝向
+                title=f"机器人 #{path_histories[0]['robot_id']} 配送路径（从停靠点出发并返回）",
             )
 
     with tab2:
@@ -158,7 +167,7 @@ def run():
                     # 如果删除的布局正是当前使用的，则清除
                     if restaurant and restaurant.name == layout_to_edit:
                         set_restaurant(None)
-                        st.experimental_rerun()
+                        st.rerun()
 
         # 加载或创建新布局
         if layout_to_edit != "创建新布局" and not is_editor_loaded():
@@ -168,7 +177,7 @@ def run():
             set_editor_loaded(True)
         elif layout_to_edit == "创建新布局" and is_editor_loaded():
             set_editor_loaded(False)
-            st.experimental_rerun()
+            st.rerun()
 
         # 渲染编辑器
         new_layout = render_layout_editor()

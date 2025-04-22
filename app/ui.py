@@ -124,8 +124,8 @@ def render_restaurant_layout(
     st.markdown(html, unsafe_allow_html=True)
 
 
-@st.cache_data(ttl=300, show_spinner=False) if ENABLE_CACHING else lambda f: f
-def render_plotly_restaurant_layout(_restaurant, path=None, title="餐厅布局"):
+@st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
+def render_plotly_restaurant_layout(_restaurant, path=None, title="餐厅布局", random_key=None):
     """
     使用Plotly渲染餐厅布局，效果更好，视觉效果类似国际象棋棋盘。
 
@@ -133,6 +133,7 @@ def render_plotly_restaurant_layout(_restaurant, path=None, title="餐厅布局"
     - _restaurant: Restaurant，餐厅实例
     - path: List[Tuple[int, int]]，可选，机器人路径
     - title: str，标题
+    - random_key: str，可选，用于强制重新渲染的随机键
     """
     layout = _restaurant.layout
     grid = layout.grid
@@ -272,6 +273,8 @@ def render_stats(stats):
     渲染统计结果
     """
     st.header("统计结果")
+    
+    # 基础指标
     col1, col2, col3 = st.columns(3)
     col1.metric("成功配送", stats["delivered"])
     col2.metric("配送失败", stats["failed"])
@@ -282,45 +285,58 @@ def render_stats(stats):
         col3.metric("成功率", f"{rate:.1f}%")
     else:
         col3.metric("成功率", "0.0%")
+    
+    # 配送周期指标
+    if "配送周期时间(秒)" in stats:
+        st.subheader("配送周期数据")
+        cycle_col1, cycle_col2, cycle_col3 = st.columns(3)
+        cycle_col1.metric("配送周期时间(秒)", f"{stats['配送周期时间(秒)']:.2f}")
+        cycle_col2.metric("配送订单数量", stats.get("配送订单数量", 0))
+        if stats.get("平均每单配送时间(秒)"):
+            cycle_col3.metric("平均每单时间(秒)", f"{stats['平均每单配送时间(秒)']:.2f}")
 
 
-@st.cache_data(ttl=300, show_spinner=False) if ENABLE_CACHING else lambda f: f
+@st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
 def render_plotly_stats(stats):
     """
-    使用Plotly可视化统计数据
-
-    参数:
-    - stats: dict，统计数据字典
+    使用Plotly渲染统计图表
     """
-    st.header("统计数据可视化")
+    st.subheader("统计图表")
 
-    # 创建基本数据
-    total = stats.get("delivered", 0) + stats.get("failed", 0)
-    success_rate = stats.get("delivered", 0) / total * 100 if total > 0 else 0
-
-    # 创建两个图表
     col1, col2 = st.columns(2)
 
     with col1:
-        # 饼图 - 成功/失败比例
+        # 饼图 - 成功率
+        total = stats.get("delivered", 0) + stats.get("failed", 0)
+        success_rate = stats.get("delivered", 0) / total * 100 if total > 0 else 0
+
         fig_pie = go.Figure(
             data=[
                 go.Pie(
-                    labels=["成功配送", "配送失败"],
+                    labels=["成功", "失败"],
                     values=[stats.get("delivered", 0), stats.get("failed", 0)],
                     hole=0.4,
-                    marker=dict(colors=["#00cc66", "#ff4d4d"]),
+                    marker=dict(
+                        colors=["#00cc66", "#ff4d4d"],
+                    ),
                     textinfo="label+percent",
                     insidetextorientation="radial",
+                    hovertemplate="<b>%{label}</b><br>%{value}个订单<extra></extra>",
                 )
             ]
         )
 
         fig_pie.update_layout(
-            title_text="配送结果分布",
-            showlegend=True,
+            title_text=f"配送成功率: {success_rate:.1f}%",
             height=350,
             margin=dict(l=10, r=10, t=50, b=10),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1,
+            ),
         )
 
         st.plotly_chart(fig_pie, use_container_width=True)
@@ -328,8 +344,22 @@ def render_plotly_stats(stats):
     with col2:
         # 条形图 - 统计数据
         data = []
+        
+        # 添加配送周期相关指标
+        cycle_stats = {
+            "配送周期时间(秒)": stats.get("配送周期时间(秒)"),
+            "配送订单数量": stats.get("配送订单数量"),
+            "平均每单配送时间(秒)": stats.get("平均每单配送时间(秒)"),
+            "分配订单总数": stats.get("分配订单总数")
+        }
+        
+        for key, value in cycle_stats.items():
+            if value is not None:
+                data.append({"指标": key, "值": value})
+        
+        # 添加路径相关指标
         for key, value in stats.items():
-            if key not in ["delivered", "failed"]:  # 添加除了基础统计外的其他统计
+            if key.startswith("平均路径") or key.startswith("最长路径") or key.startswith("最短路径") or key == "模拟时间(秒)":
                 data.append({"指标": key, "值": value})
 
         # 添加基础统计和计算数据
@@ -348,6 +378,10 @@ def render_plotly_stats(stats):
             "配送失败": "#ff4d4d",
             "总订单数": "#4da6ff",
             "成功率": "#f5c518",
+            "配送周期时间(秒)": "#ff9900",
+            "配送订单数量": "#9c27b0",
+            "平均每单配送时间(秒)": "#2196f3",
+            "分配订单总数": "#795548"
         }
 
         colors = [color_map.get(item["指标"], "#9467bd") for item in data]
@@ -394,15 +428,10 @@ def format_value(key, value, metrics):
         return value if not isinstance(value, float) else f"{value:.1f}"
 
 
-@st.cache_data(ttl=300, show_spinner=False) if ENABLE_CACHING else lambda f: f
-def render_plotly_robot_path(_restaurant, path_history, title="机器人路径"):
+@st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
+def render_plotly_robot_path(_restaurant, path_history, robot_orientation=90, title="机器人路径"):
     """
-    使用Plotly可视化机器人行进路径
-
-    参数:
-    - _restaurant: Restaurant，餐厅实例
-    - path_history: List[Tuple[int, int]]，机器人历史路径
-    - title: str，标题
+    使用Plotly渲染机器人路径可视化
     """
     layout = _restaurant.layout
     grid = layout.grid
@@ -477,73 +506,68 @@ def render_plotly_robot_path(_restaurant, path_history, title="机器人路径")
     # 添加路径点
     if path_history and len(path_history) > 0:
         path_y, path_x = zip(*path_history)  # 注意Plotly的坐标系
-
-        # 添加带有方向箭头的路径
+        
+        # 机器人起点和终点
+        start_point = path_history[0]
+        end_point = path_history[-1]
+        
+        # 绘制完整路径
         fig.add_trace(
             go.Scatter(
                 x=path_x,
                 y=path_y,
-                mode="lines+markers",
-                marker=dict(
-                    size=8,
-                    color="red",
-                    symbol="circle",
-                ),
+                mode="lines",
                 line=dict(
-                    width=2,
-                    color="red",
+                    width=3,
+                    color="rgba(255, 0, 0, 0.6)",
                     dash="solid",
                 ),
-                name="路径",
+                name="机器人路径",
             )
         )
-
-        # 标记起点和终点
-        if len(path_history) > 1:
-            # 起点
-            fig.add_trace(
-                go.Scatter(
-                    x=[path_x[0]],
-                    y=[path_y[0]],
-                    mode="markers",
-                    marker=dict(
-                        size=12,
-                        color="blue",
-                        symbol="circle",
-                        line=dict(
-                            width=2,
-                            color="darkblue",
-                        ),
-                    ),
-                    name="起点",
-                )
+        
+        # 突出显示起点
+        fig.add_trace(
+            go.Scatter(
+                x=[start_point[1]],
+                y=[start_point[0]],
+                mode="markers",
+                marker=dict(
+                    size=14,
+                    color="green",
+                    symbol="circle",
+                    line=dict(width=2, color="darkgreen"),
+                ),
+                name="起点",
+                hoverinfo="text",
+                hovertext="起点",
             )
-
-            # 终点
-            fig.add_trace(
-                go.Scatter(
-                    x=[path_x[-1]],
-                    y=[path_y[-1]],
-                    mode="markers",
-                    marker=dict(
-                        size=12,
-                        color="green",
-                        symbol="circle",
-                        line=dict(
-                            width=2,
-                            color="darkgreen",
-                        ),
-                    ),
-                    name="终点",
-                )
+        )
+        
+        # 突出显示终点/当前位置
+        fig.add_trace(
+            go.Scatter(
+                x=[end_point[1]],
+                y=[end_point[0]],
+                mode="markers",
+                marker=dict(
+                    size=14,
+                    color="red",
+                    symbol="circle",
+                    line=dict(width=2, color="darkred"),
+                ),
+                name="终点/当前位置",
+                hoverinfo="text",
+                hovertext="终点/当前位置",
             )
+        )
 
     # 设置图表布局
     fig.update_layout(
         title=dict(text=title, font=dict(size=20)),
         width=width * 50,  # 根据网格大小调整图表大小
         height=height * 50,
-        margin=dict(l=10, r=10, t=50, b=10),
+        margin=dict(l=0, r=0, t=40, b=0),
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(
             showgrid=True,
@@ -563,14 +587,21 @@ def render_plotly_robot_path(_restaurant, path_history, title="机器人路径")
             scaleratio=1,
             range=[height - 0.5, -0.5],  # 反转Y轴使(0,0)在左上角
         ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
     return fig
 
 
-@st.cache_data(ttl=300, show_spinner=False) if ENABLE_CACHING else lambda f: f
+@st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
 def render_plotly_stats_extended(stats_data, custom_metrics=None):
     """
     渲染扩展的统计数据可视化，支持自定义指标
@@ -1111,3 +1142,128 @@ def validate_layout():
         return False
 
     return True
+
+
+def render_plotly_restaurant_layout_no_cache(_restaurant, path=None, title="餐厅布局"):
+    """
+    无缓存版本的餐厅布局渲染函数，确保每次都重新渲染最新的布局。
+    
+    参数:
+    - _restaurant: Restaurant，餐厅实例
+    - path: List[Tuple[int, int]]，可选，机器人路径
+    - title: str，标题
+    """
+    layout = _restaurant.layout
+    grid = layout.grid
+    height = layout.height
+    width = layout.width
+
+    # 创建颜色映射
+    colormap = {
+        0: "white",  # 空地
+        1: "#333333",  # 墙壁/障碍
+        2: "#00cc66",  # 桌子
+        3: "#f5c518",  # 厨房
+        4: "#4da6ff",  # 停靠点
+    }
+
+    # 创建标签映射
+    labels = [["" for _ in range(width)] for _ in range(height)]
+
+    # 设置桌子标签
+    for table_id, pos in layout.tables.items():
+        row, col = pos
+        labels[row][col] = table_id
+
+    # 设置厨房标签
+    for row, col in layout.kitchen:
+        labels[row][col] = "厨"
+
+    # 设置停靠点标签
+    if layout.parking:
+        row, col = layout.parking
+        labels[row][col] = "停"
+
+    # 创建热力图数据
+    fig = go.Figure()
+
+    # 添加热力图 - 显示颜色块
+    heatmap_z = np.array(grid)
+    colorscale = [
+        [0, colormap[0]],
+        [0.2, colormap[0]],
+        [0.2, colormap[1]],
+        [0.4, colormap[1]],
+        [0.4, colormap[2]],
+        [0.6, colormap[2]],
+        [0.6, colormap[3]],
+        [0.8, colormap[3]],
+        [0.8, colormap[4]],
+        [1.0, colormap[4]],
+    ]
+
+    fig.add_trace(
+        go.Heatmap(
+            z=heatmap_z,
+            colorscale=colorscale,
+            showscale=False,
+            hoverinfo="none",
+        )
+    )
+
+    # 添加文本注释 - 显示标签
+    for i in range(height):
+        for j in range(width):
+            if labels[i][j]:
+                fig.add_annotation(
+                    x=j,
+                    y=i,
+                    text=labels[i][j],
+                    showarrow=False,
+                    font=dict(size=14, color="black", family="Arial Black"),
+                )
+
+    # 添加路径点（如果有）
+    if path:
+        path_y, path_x = zip(*path)  # 注意Plotly的坐标系
+        fig.add_trace(
+            go.Scatter(
+                x=path_x,
+                y=path_y,
+                mode="lines+markers",
+                marker=dict(size=8, color="red"),
+                line=dict(width=2, color="red"),
+                name="路径",
+            )
+        )
+
+    # 设置图表布局
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=20)),
+        width=width * 50,  # 根据网格大小调整图表大小
+        height=height * 50,
+        margin=dict(l=0, r=0, t=40, b=0),
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(
+            showgrid=True,
+            gridcolor="lightgrey",
+            gridwidth=1,
+            zeroline=False,
+            showticklabels=False,
+            range=[-0.5, width - 0.5],
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="lightgrey",
+            gridwidth=1,
+            zeroline=False,
+            showticklabels=False,
+            scaleanchor="x",
+            scaleratio=1,
+            range=[height - 0.5, -0.5],  # 反转Y轴使(0,0)在左上角
+        ),
+    )
+
+    st.plotly_chart(fig)
+
+    return fig
