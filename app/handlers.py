@@ -57,5 +57,5 @@ def handle_simulation(restaurant, use_ai, num_orders):
         # 创建模拟引擎
         engine = SimulationEngine(restaurant, use_ai)
         # 运行模拟
-        stats = engine.run(num_orders)
-        return stats 
+        stats, path_histories = engine.run(num_orders)
+        return stats, path_histories 

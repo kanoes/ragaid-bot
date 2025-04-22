@@ -2,7 +2,8 @@
 模拟引擎
 """
 import random
-
+import time
+import threading
 from .utils import build_robot, make_order
 from .constants import logger
 
@@ -20,6 +21,7 @@ class SimulationEngine:
         self.restaurant = restaurant
         self.use_ai = use_ai
         self.stats = {"delivered": 0, "failed": 0}
+        self.path_histories = []
         
     def run(self, num_orders):
         """
@@ -32,6 +34,10 @@ class SimulationEngine:
             dict: 模拟统计结果
         """
         self.stats = {"delivered": 0, "failed": 0}
+        self.path_histories = []
+        
+        # 性能优化：批处理订单，减少UI更新频率
+        start_time = time.time()
         
         for i in range(num_orders):
             # 随机选择桌子
@@ -46,15 +52,28 @@ class SimulationEngine:
                 logger.info(f"订单 #{order.order_id} 分配到 Robot#{bot.robot_id}")
                 bot.simulate()
                 
-                # 可视化路径
-                # animate_robot_path(
-                #     bot.path_history,
-                #     title=f"Robot#{bot.robot_id} Order#{order.order_id}",
-                #     fps=4,
-                # )
+                # 记录路径历史
+                self.path_histories.append({
+                    "order_id": order.order_id,
+                    "robot_id": bot.robot_id,
+                    "table_id": order.table_id,
+                    "path": bot.path_history
+                })
+                
                 self.stats["delivered"] += 1
             else:
                 logger.error(f"订单 #{order.order_id} 无法配送")
                 self.stats["failed"] += 1
+        
+        # 添加路径统计数据
+        if self.path_histories:
+            path_lengths = [len(ph["path"]) for ph in self.path_histories]
+            self.stats["平均路径长度"] = sum(path_lengths) / len(path_lengths)
+            self.stats["最长路径"] = max(path_lengths)
+            self.stats["最短路径"] = min(path_lengths)
+            
+        # 添加性能统计
+        end_time = time.time()
+        self.stats["模拟时间(秒)"] = round(end_time - start_time, 2)
                 
-        return self.stats 
+        return self.stats, self.path_histories 

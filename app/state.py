@@ -52,6 +52,14 @@ def set_stats(stats):
     """设置模拟统计结果"""
     st.session_state["stats"] = stats
 
+def get_path_histories():
+    """获取路径历史记录"""
+    return st.session_state.get("path_histories", [])
+
+def set_path_histories(path_histories):
+    """设置路径历史记录"""
+    st.session_state["path_histories"] = path_histories
+
 # 布局编辑器状态管理函数
 def get_editor_height():
     """获取编辑器高度"""
