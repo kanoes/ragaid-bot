@@ -296,14 +296,14 @@ def delete_restaurant_layout(layout_name, layout_dir=LAYOUT_DIR):
         return True
     return False
 
-def build_robot(use_ai, layout):
+def build_robot(use_ai, layout, restaurant_name="默认餐厅"):
     """
     构建机器人实例
     """
     if use_ai:
-        robot = AIEnhancedRobot(layout, robot_id=1, knowledge_dir=RAG_KB_DIR)
+        robot = AIEnhancedRobot(layout, robot_id=1, knowledge_dir=RAG_KB_DIR, restaurant_name=restaurant_name)
     else:
-        robot = Robot(layout, robot_id=1)
+        robot = Robot(layout, robot_id=1, restaurant_name=restaurant_name)
         
     # 设置机器人的目标容忍参数
     robot.GOAL_TOLERANCE = 0  # 必须到达确切位置才算送达

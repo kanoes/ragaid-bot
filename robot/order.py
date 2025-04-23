@@ -71,6 +71,8 @@ class Order:
         self.delivery_success: Optional[bool] = None
         self.is_assigned = False
         self.assigned_robot_id: Optional[int] = None
+        # 配送完成顺序编号（按照实际送达顺序）
+        self.delivery_sequence: Optional[int] = None
 
     # ---- 状态流转 ----------------------------------------------------------
     def start_preparing(self) -> None:

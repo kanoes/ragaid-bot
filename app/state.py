@@ -14,6 +14,12 @@ def init_session_state():
 
     if "stats" not in st.session_state:
         st.session_state["stats"] = None
+        
+    if "batch_histories" not in st.session_state:
+        st.session_state["batch_histories"] = []
+        
+    if "current_batch_id" not in st.session_state:
+        st.session_state["current_batch_id"] = 0
 
     # 初始化布局编辑器状态
     if "editor_height" not in st.session_state:
@@ -81,6 +87,40 @@ def set_path_histories(path_histories):
     设置路径历史记录
     """
     st.session_state["path_histories"] = path_histories
+
+
+def get_batch_histories():
+    """
+    获取所有批次历史数据
+    """
+    return st.session_state.get("batch_histories", [])
+
+
+def set_batch_histories(batch_histories):
+    """
+    设置批次历史数据
+    """
+    st.session_state["batch_histories"] = batch_histories
+
+
+def append_batch_histories(new_batch_histories):
+    """
+    将新的批次历史数据添加到现有历史数据中
+    
+    Args:
+        new_batch_histories: 新的批次历史数据列表
+    """
+    if new_batch_histories:
+        current_histories = get_batch_histories()
+        st.session_state["batch_histories"] = current_histories + new_batch_histories
+
+
+def reset_batch_histories():
+    """
+    重置批次历史数据和批次ID
+    """
+    st.session_state["batch_histories"] = []
+    st.session_state["current_batch_id"] = 0
 
 
 # 布局编辑器状态管理函数
@@ -242,3 +282,31 @@ def load_layout_to_editor(restaurant):
         set_editor_loaded(True)
         return True
     return False
+
+
+def get_next_batch_id():
+    """
+    获取下一个批次ID并增加计数器
+    """
+    if "current_batch_id" not in st.session_state:
+        st.session_state["current_batch_id"] = 0
+    
+    st.session_state["current_batch_id"] += 1
+    return st.session_state["current_batch_id"]
+
+
+def get_current_batch_id():
+    """
+    获取当前批次ID
+    """
+    if "current_batch_id" not in st.session_state:
+        st.session_state["current_batch_id"] = 0
+    
+    return st.session_state["current_batch_id"]
+
+
+def reset_batch_id():
+    """
+    重置批次ID计数器
+    """
+    st.session_state["current_batch_id"] = 0

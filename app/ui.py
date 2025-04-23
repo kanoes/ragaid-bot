@@ -26,6 +26,7 @@ from .state import (
     get_editor_layout_name,
     set_editor_layout_name,
     reset_editor,
+    get_batch_histories,
 )
 
 # 性能优化配置
@@ -289,206 +290,113 @@ def _get_table_style(x, y, tables):
 
 def render_stats(stats):
     """
-    渲染统计结果
+    显示基本统计信息
     """
-    st.header("统计结果")
+    st.subheader("本次模拟数据")
     
-    # 基础指标
-    col1, col2, col3 = st.columns(3)
-    col1.metric("总订单数", stats.get("total_orders", 0))
-    col2.metric("总批次数", stats.get("total_batches", 0))
-    col3.metric("机器人类型", stats.get("机器人类型", "基础机器人"))
+    # 显示指标 - 删除了total_steps
+    metrics = {
+        "total_orders": "总订单数",
+        "total_time": "总配送时间",
+        "avg_waiting_time": "平均订单等待时间",
+        "总配送路程": "总配送路程",
+        "餐厅布局": "餐厅布局",
+        "机器人类型": "机器人类型",
+    }
     
-    # 路径和时间指标
-    path_col1, path_col2, path_col3 = st.columns(3)
-    path_col1.metric("总路径长度", stats.get("总路径长度", 0))
-    path_col2.metric("总步数", stats.get("total_steps", 0))
-    path_col3.metric("总配送时间(秒)", f"{stats.get('total_delivery_time', 0):.2f}")
-    
-    # 平均指标
-    avg_col1, avg_col2, avg_col3 = st.columns(3)
-    avg_col1.metric("平均每批次订单数", f"{stats.get('平均每批次订单数', 0):.2f}")
-    avg_col2.metric("平均每订单步数", f"{stats.get('平均每订单步数', 0):.2f}")
-    avg_col3.metric("平均每订单配送时间", f"{stats.get('平均每订单配送时间', 0):.2f}")
-    
-    # 配送历史记录
-    if "配送历史" in stats and stats["配送历史"]:
-        st.subheader("配送批次历史")
-        history_df = pd.DataFrame(stats["配送历史"])
+    if stats:
+        # 添加餐厅布局名称
+        if "配送历史" in stats and stats["配送历史"] and "餐厅布局" in stats["配送历史"][0]:
+            stats["餐厅布局"] = stats["配送历史"][0]["餐厅布局"]
+            
+        # 使用更紧凑的布局
+        col1, col2 = st.columns(2)
         
-        # 格式化时间戳为易读格式
-        if len(history_df) > 0 and "start_time" in history_df.columns and "end_time" in history_df.columns:
-            history_df["开始时间"] = history_df["start_time"].apply(
-                lambda x: time.strftime("%H:%M:%S", time.localtime(x)) if x else ""
-            )
-            history_df["结束时间"] = history_df["end_time"].apply(
-                lambda x: time.strftime("%H:%M:%S", time.localtime(x)) if x else ""
-            )
-            
-            # 显示友好的列名
-            display_columns = {
-                "batch_id": "批次ID",
-                "开始时间": "开始时间",
-                "结束时间": "结束时间",
-                "duration": "持续时间(秒)",
-                "orders_count": "订单数量",
-                "path_length": "路径长度"
-            }
-            
-            # 选择并重命名要显示的列
-            display_df = history_df[[col for col in display_columns.keys() if col in history_df.columns]]
-            display_df.columns = [display_columns[col] for col in display_df.columns]
-            
-            st.dataframe(display_df, use_container_width=True)
-        else:
-            st.info("配送历史数据格式不完整，无法显示详细信息")
-    else:
-        st.info("暂无配送历史数据，请先运行模拟")
+        # 左半部分
+        with col1:
+            if "total_orders" in stats:
+                st.write(f"**总订单数:** {stats['total_orders']}")
+            if "total_time" in stats:
+                st.write(f"**总配送时间:** {stats['total_time']:.2f}")
+            if "avg_waiting_time" in stats:
+                st.write(f"**平均订单等待时间:** {stats['avg_waiting_time']:.2f}")
+                
+        # 右半部分
+        with col2:
+            if "总配送路程" in stats:
+                st.write(f"**总配送路程:** {stats['总配送路程']}")
+            if "餐厅布局" in stats:
+                st.write(f"**餐厅布局:** {stats['餐厅布局']}")
+            if "机器人类型" in stats:
+                st.write(f"**机器人类型:** {stats['机器人类型']}")
+        
+        st.write("---")
+        st.caption("注: 总配送时间和路径长度计算从停靠点出发到送达所有订单并返回停靠点")
 
 
 @st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
 def render_plotly_stats(stats):
     """
-    使用Plotly渲染统计图表
+    使用Plotly渲染统计数据图表
     """
-    st.subheader("统计图表")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        # 饼图 - 批次与订单比例
-        fig_pie = go.Figure()
+    if not stats:
+        return
         
-        if stats.get("total_batches", 0) > 0:
-            fig_pie.add_trace(go.Pie(
-                labels=["订单", "批次"],
-                values=[stats.get("total_orders", 0), stats.get("total_batches", 0)],
-                hole=0.4,
-                marker=dict(
-                    colors=["#00cc66", "#4da6ff"],
-                ),
-                textinfo="label+value",
-                insidetextorientation="radial",
-                hovertemplate="<b>%{label}</b><br>%{value}<extra></extra>",
-            ))
-            
-            fig_pie.update_layout(
-                title_text=f"平均每批次订单数: {stats.get('平均每批次订单数', 0):.1f}",
-                height=350,
-                margin=dict(l=10, r=10, t=50, b=10),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1,
-                ),
-            )
-            
-            st.plotly_chart(fig_pie, use_container_width=True)
-        else:
-            st.info("暂无批次数据")
-
-    with col2:
-        # 条形图 - 统计数据
-        data = []
-        
-        # 添加主要指标
-        metrics_to_show = [
-            "总路径长度", 
-            "total_steps", 
-            "total_orders", 
-            "total_batches", 
-            "平均每批次订单数",
-            "平均每订单步数",
-            "平均每订单配送时间"
-        ]
-        
-        display_names = {
-            "total_steps": "总步数",
-            "total_orders": "总订单数", 
-            "total_batches": "总批次数",
-            "平均每批次订单数": "平均每批次订单数",
-            "平均每订单步数": "平均每订单步数",
-            "平均每订单配送时间": "平均每订单配送时间(秒)"
-        }
-        
-        for key in metrics_to_show:
-            if key in stats and stats[key] is not None:
-                display_name = display_names.get(key, key)
-                data.append({"指标": display_name, "值": stats[key]})
-        
-        # 添加路径相关指标
-        for key in ["平均路径长度", "最长路径", "最短路径", "模拟时间(秒)"]:
-            if key in stats and stats[key] is not None:
-                data.append({"指标": key, "值": stats[key]})
-
-        # 定义颜色映射
-        color_map = {
-            "总订单数": "#00cc66",
-            "总批次数": "#ff9900",
-            "总路径长度": "#4da6ff",
-            "总步数": "#9c27b0",
-            "平均每批次订单数": "#f5c518",
-            "平均每订单步数": "#2196f3",
-            "平均每订单配送时间(秒)": "#ff4d4d",
-            "模拟时间(秒)": "#795548"
-        }
-
-        colors = [color_map.get(item["指标"], "#9467bd") for item in data]
-
-        fig_bar = go.Figure()
-        fig_bar.add_trace(
-            go.Bar(
-                x=[item["指标"] for item in data],
-                y=[item["值"] for item in data],
-                marker_color=colors,
-                text=[
-                    (
-                        f"{item['值']:.1f}"
-                        if isinstance(item["值"], float)
-                        else str(item["值"])
-                    )
-                    for item in data
-                ],
-                textposition="auto",
-            )
+    # 准备基本统计数据
+    key_metrics = {
+        "总订单数": stats.get("total_orders", 0),
+        "总配送路程": stats.get("总配送路程", 0),
+        "总配送时间": stats.get("total_time", 0),
+        "平均订单等待时间": stats.get("avg_waiting_time", 0)
+    }
+    
+    # 创建条形图
+    fig = go.Figure()
+    
+    # 添加条形
+    fig.add_trace(
+        go.Bar(
+            x=list(key_metrics.keys()),
+            y=list(key_metrics.values()),
+            text=[format_value(k, v, key_metrics) for k, v in key_metrics.items()],
+            textposition='auto',
+            marker_color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
         )
-
-        fig_bar.update_layout(
-            title_text="配送统计详情",
-            xaxis=dict(title="指标"),
-            yaxis=dict(title="数值"),
-            height=350,
-            margin=dict(l=10, r=10, t=50, b=10),
-        )
-
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    return [fig_pie, fig_bar]
+    )
+    
+    # 设置布局
+    fig.update_layout(
+        title="核心性能指标",
+        xaxis_title="指标",
+        yaxis_title="数值",
+        height=400,
+        margin=dict(l=40, r=40, t=40, b=40)
+    )
+    
+    # 显示图表
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def format_value(key, value, metrics):
     """
     格式化值显示
     """
-    formatter = metrics.get(key, {}).get("format", lambda x: x)
-    try:
-        return formatter(value)
-    except:
-        return value if not isinstance(value, float) else f"{value:.1f}"
+    # 简单处理，不依赖metrics中的格式化器
+    if isinstance(value, float):
+        return f"{value:.1f}"
+    return str(value)
 
 
 @st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
 def render_plotly_robot_path(_restaurant, path_history, orders=None, title="机器人路径"):
     """
-    使用Plotly渲染机器人路径可视化
+    渲染机器人路径的动态图表
     
-    参数:
-    - _restaurant: Restaurant对象
-    - path_history: 路径历史
-    - orders: 订单列表，格式为[{"order_id": id, "table_id": table_id}, ...]
-    - title: 图表标题
+    Args:
+        _restaurant: Restaurant 实例
+        path_history: 路径历史
+        orders: 订单列表
+        title: 图表标题
     """
     layout = _restaurant.layout
     grid = layout.grid
@@ -629,48 +537,50 @@ def render_plotly_robot_path(_restaurant, path_history, orders=None, title="机�
             )
         )
         
-        # 只有当有订单信息时，才添加送达点标记
-        if orders and isinstance(orders, list) and len(orders) > 0:
+        # 如果提供了订单信息，按配送顺序排序并添加标注
+        if orders:
             # 获取所有桌子的送餐点
             table_delivery_points = {}
-            for table_id, table_pos in layout.tables.items():
-                delivery_pos = layout.get_delivery_point(table_id)
+            for table_id, table_pos in _restaurant.layout.tables.items():
+                delivery_pos = _restaurant.layout.get_delivery_point(table_id)
                 if delivery_pos:
                     table_delivery_points[table_id] = delivery_pos
+                    
+            # 尝试按配送顺序排序
+            sorted_orders = sorted(orders, key=lambda x: x.get('delivery_sequence', float('inf')))
             
-            # 创建送达点列表，只标记实际送达的桌子
-            delivery_points = []
-            for index, order in enumerate(orders, 1):
-                table_id = order.get("table_id")
-                if table_id and table_id in table_delivery_points:
-                    delivery_pos = table_delivery_points[table_id]
-                    # 确保该点是真正的送达点而不仅仅是路径中的点
-                    delivery_points.append((delivery_pos, index, table_id))
-            
-            # 添加送达点标记
-            if delivery_points:
-                dp_y, dp_x = zip(*[dp[0] for dp in delivery_points])
-                dp_nums = [dp[1] for dp in delivery_points]
-                dp_tables = [dp[2] for dp in delivery_points]
+            # 为每个已配送的订单添加标记
+            for order in sorted_orders:
+                table_id = order.get('table_id')
+                order_id = order.get('order_id')
+                delivery_seq = order.get('delivery_sequence')
                 
-                fig.add_trace(
-                    go.Scatter(
-                        x=dp_x,
-                        y=dp_y,
-                        mode="markers+text",
+                # 只标注有配送顺序的订单（已完成配送的）
+                if delivery_seq and table_id in table_delivery_points:
+                    # 使用配送目标点而不是桌子位置
+                    delivery_pos = table_delivery_points[table_id]
+                    
+                    # 显示配送顺序而不是订单ID
+                    hover_text = f"配送顺序: #{delivery_seq}<br>订单ID: #{order_id}<br>桌号: {table_id}"
+                    table_markers = go.Scatter(
+                        x=[delivery_pos[1]],
+                        y=[delivery_pos[0]],
+                        mode='markers+text',
                         marker=dict(
                             size=20,
                             color="rgba(255, 165, 0, 0.8)",  # 橙色半透明
                             symbol="circle",
                             line=dict(width=2, color="orange"),
                         ),
-                        text=dp_nums,  # 显示送达序号
+                        text=[f"{delivery_seq}"],  # 只显示数字，不显示#符号
+                        textposition="middle center",
                         textfont=dict(size=12, color="black", family="Arial Black"),
-                        name="送达顺序",
-                        hoverinfo="text",
-                        hovertext=[f"送达点 #{num}: 桌号 {table}" for num, table in zip(dp_nums, dp_tables)],
+                        name="配送顺序",  # 简化图例名称
+                        hoverinfo='text',
+                        hovertext=hover_text,
+                        showlegend=(order == sorted_orders[0])  # 只为第一个点显示图例
                     )
-                )
+                    fig.add_trace(table_markers)
 
     # 设置图表布局
     fig.update_layout(
@@ -746,6 +656,9 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
     """
     if not stats_data:
         return
+        
+    # 获取累积的历史批次数据
+    batch_histories = get_batch_histories()
 
     st.header("高级统计分析")
 
@@ -753,7 +666,7 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
     default_metrics = {
         "total_orders": {"color": "#00cc66", "format": lambda x: int(x)},
         "total_batches": {"color": "#ff9900", "format": lambda x: int(x)},
-        "总路径长度": {"color": "#4da6ff", "format": lambda x: int(x)},
+        "总配送路程": {"color": "#4da6ff", "format": lambda x: int(x)},
         "平均每批次订单数": {"color": "#f5c518", "format": lambda x: f"{x:.2f}"},
         "平均每订单步数": {"color": "#2196f3", "format": lambda x: f"{x:.2f}"}
     }
@@ -785,9 +698,9 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
     # 添加路径长度指标
     data.append(
         {
-            "指标": "总路径长度",
-            "值": stats_data.get("总路径长度", 0),
-            "颜色": metrics.get("总路径长度", {}).get("color", "#4da6ff"),
+            "指标": "总配送路程",
+            "值": stats_data.get("总配送路程", 0),
+            "颜色": metrics.get("总配送路程", {}).get("color", "#4da6ff"),
         }
     )
 
@@ -801,7 +714,7 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
 
     # 添加其他统计指标
     for key, value in stats_data.items():
-        if key not in ["total_orders", "total_batches", "总路径长度", "平均每批次订单数", "平均每订单步数", "平均每订单配送时间", "配送历史"]:
+        if key not in ["total_orders", "total_batches", "总配送路程", "平均每批次订单数", "平均每订单步数", "平均每订单配送时间", "配送历史"]:
             metric_config = metrics.get(
                 key, {"color": "#9467bd", "format": lambda x: x}
             )
@@ -861,7 +774,73 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
 
     with tabs[2]:
         # 批次历史分析
-        if "配送历史" in stats_data and stats_data["配送历史"] and len(stats_data["配送历史"]) > 0:
+        if batch_histories:  # 优先使用累积的历史批次数据
+            # 将历史数据转换为DataFrame进行分析
+            history_df = pd.DataFrame(batch_histories)
+            
+            # 批次订单数分布
+            if "orders_count" in history_df.columns:
+                st.subheader("批次订单数分布")
+                fig_batch = go.Figure()
+                fig_batch.add_trace(
+                    go.Bar(
+                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        y=history_df["orders_count"],
+                        marker_color="#4da6ff",
+                        text=history_df["orders_count"],
+                        textposition="auto",
+                    )
+                )
+                fig_batch.update_layout(
+                    title="各批次订单数量",
+                    xaxis=dict(title="批次"),
+                    yaxis=dict(title="订单数量"),
+                    height=300,
+                )
+                st.plotly_chart(fig_batch, use_container_width=True)
+            
+            # 批次路径长度分布
+            if "path_length" in history_df.columns:
+                st.subheader("批次路径长度分布")
+                fig_path = go.Figure()
+                fig_path.add_trace(
+                    go.Bar(
+                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        y=history_df["path_length"],
+                        marker_color="#00cc66",
+                        text=history_df["path_length"],
+                        textposition="auto",
+                    )
+                )
+                fig_path.update_layout(
+                    title="各批次路径长度",
+                    xaxis=dict(title="批次"),
+                    yaxis=dict(title="路径长度"),
+                    height=300,
+                )
+                st.plotly_chart(fig_path, use_container_width=True)
+                
+            # 批次配送时间分布
+            if "duration" in history_df.columns:
+                st.subheader("批次配送时间分布")
+                fig_duration = go.Figure()
+                fig_duration.add_trace(
+                    go.Bar(
+                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        y=history_df["duration"],
+                        marker_color="#ff9900",
+                        text=[f"{d:.2f}" for d in history_df["duration"]],
+                        textposition="auto",
+                    )
+                )
+                fig_duration.update_layout(
+                    title="各批次配送时间(秒)",
+                    xaxis=dict(title="批次"),
+                    yaxis=dict(title="时间(秒)"),
+                    height=300,
+                )
+                st.plotly_chart(fig_duration, use_container_width=True)
+        elif "配送历史" in stats_data and stats_data["配送历史"]:  # 如果没有累积数据，使用当前模拟数据
             # 将历史数据转换为DataFrame进行分析
             history_df = pd.DataFrame(stats_data["配送历史"])
             
@@ -928,7 +907,7 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                 )
                 st.plotly_chart(fig_duration, use_container_width=True)
         else:
-            st.info("暂无批次历史数据，请先运行模拟并确保机器人完成了配送周期。")
+            st.info("暂无批次历史数据")
 
     return data
 

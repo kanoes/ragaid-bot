@@ -41,10 +41,13 @@ class Robot:
         self,
         layout: RestaurantLayout,
         robot_id: int = 1,
+        restaurant_name: str = "默认餐厅",
         start: Optional[Tuple[int, int]] = None,
     ) -> None:
         self.layout = layout
         self.robot_id = robot_id
+        self.speed = 1.0  # 机器人速度，单位：格子/时间单位
+        self.restaurant_name = restaurant_name
 
         # 确保机器人从停靠点出发
         self.parking_spot = layout.parking or (layout.kitchen[0] if layout.kitchen else (0, 0))
@@ -62,10 +65,9 @@ class Robot:
         # 新的统计数据结构
         self._stats = {
             "total_steps": 0,            # 总步数（路径长度）
-            "total_delivery_time": 0,    # 总配送时间
+            "total_time": 0,             # 总配送时间
             "total_orders": 0,           # 总订单数
-            "total_batches": 0,          # 总批次数
-            "current_batch_orders": 0,   # 当前批次订单数
+            "avg_waiting_time": 0,       # 平均订单等待时间
         }
         # 历史配送记录
         self._delivery_history = []
@@ -84,7 +86,7 @@ class Robot:
         # 当前批次信息
         self.current_batch_start_time = None  # 当前批次开始时间
         self.current_batch_orders = []        # 当前批次订单
-        self.current_batch_path_length = 0    # 当前批次路径长度
+        self.current_batch_id = 0             # 当前批次ID
 
     # ---------------- 订单接口 ---------------- #
     def assign_order(self, order: Order) -> bool:
@@ -127,9 +129,8 @@ class Robot:
         # 记录当前批次开始
         if not self.current_batch_start_time:
             self.current_batch_start_time = time.time()
-            self._stats["total_batches"] += 1
+            self.current_batch_id += 1
             self.current_batch_orders = []
-            self.current_batch_path_length = 0
 
         # 取出下一个订单
         order = self.order_queue.popleft()
@@ -137,8 +138,10 @@ class Robot:
         
         # 添加到当前批次
         self.current_batch_orders.append(order)
-        self._stats["current_batch_orders"] += 1
-
+        
+        # 计算订单等待时间 (从创建到开始配送)
+        waiting_time = time.time() - order.created_time
+        
         # 获取桌子对应的送餐点
         delivery_pos = self.layout.get_delivery_point(order.table_id)
         if not delivery_pos:
@@ -166,7 +169,7 @@ class Robot:
         
         # 如果是第一次从停靠点出发，记录开始时间
         if self.position == self.parking_spot and self.delivery_start_time is None:
-            self.delivery_start_time = order.delivery_start_time
+            self.delivery_start_time = time.time()
         
         logger.info("机器人 #%s 开始送餐至桌号 %s，目标位置 %s",
                    self.robot_id, order.table_id, self.goal)
@@ -240,7 +243,7 @@ class Robot:
         for order in new_queue:
             self.order_queue.append(order)
             
-        # 计算估计的总路径长度
+        # 计算估计的总配送路程
         total_distance = sum(distances[tour[i]][tour[i+1]] for i in range(len(tour)-1))
         
         logger.info("Robot #%s 优化了订单队列，执行顺序: %s（估计总长度: %d）", 
@@ -316,7 +319,6 @@ class Robot:
         # 只有在实际移动时才记录轨迹
         if self.position != prev:
             self.path_history.append(self.position)
-            self.current_batch_path_length += 1
             
         # 检查是否已经到达目标点（考虑容忍范围）
         if self.goal and self._is_at_goal():
@@ -327,9 +329,14 @@ class Robot:
         if not self.current_order:
             return
         if success:
+            # 添加配送完成序号
+            self.current_order.delivery_sequence = self._stats["total_orders"] + 1
             self.current_order.complete_delivery()
             self._stats["total_orders"] += 1
-            logger.info("订单 #%s 送达成功", self.current_order.order_id)
+            logger.info("订单 #%s (桌号: %s) 送达成功，配送顺序: #%d", 
+                       self.current_order.order_id, 
+                       self.current_order.table_id,
+                       self.current_order.delivery_sequence)
         else:
             self.current_order.fail_delivery()
             logger.error("订单 #%s 送达失败", self.current_order.order_id)
@@ -339,13 +346,13 @@ class Robot:
 
     def _calculate_delivery_cycle_time(self) -> None:
         """
-        计算从停靠点出发到返回停靠点的总时间和统计数据
+        计算从停靠点出发到返回停靠点的总配送时间和统计数据
         """
         if self.delivery_start_time is not None:
             end_time = time.time()
-            batch_time = 0
             
-            # 计算本次批次的时间，如果有批次开始时间
+            # 计算本次批次的时间
+            batch_time = 0
             if self.current_batch_start_time is not None:
                 batch_time = end_time - self.current_batch_start_time
             else:
@@ -353,39 +360,72 @@ class Robot:
                 batch_time = end_time - self.delivery_start_time
                 self.current_batch_start_time = self.delivery_start_time  # 确保有批次开始时间
             
-            total_time = end_time - self.delivery_start_time
+            # 计算总配送路程
+            path_length = len(self.path_history) - 1  # 减去初始位置
+            
+            # 根据路径长度和速度计算时间
+            calculated_time = path_length / self.speed
             
             # 更新统计数据
-            self._stats["total_delivery_time"] += total_time
-            self._stats["total_steps"] += len(self.path_history) - 1  # 减去初始位置
+            self._stats["total_steps"] += path_length
+            self._stats["total_time"] = calculated_time  # 使用计算的时间
             
-            # 确保至少有一个批次
-            if self._stats["total_batches"] == 0:
-                self._stats["total_batches"] = 1
+            # 计算本批次平均订单等待时间
+            avg_batch_waiting_time = 0
+            if self.current_batch_orders:
+                total_waiting_time = 0
+                for i, order in enumerate(self.current_batch_orders):
+                    # 订单等待时间 = 订单送达时间 = 从开始到当前订单的配送时间
+                    # 按照配送顺序计算，前面的订单等待时间短，后面的等待时间长
+                    order_delivery_time = calculated_time * (i+1) / len(self.current_batch_orders)
+                    total_waiting_time += order_delivery_time
+                
+                # 平均订单等待时间 = 总等待时间 / 订单数量
+                avg_batch_waiting_time = total_waiting_time / len(self.current_batch_orders)
+                
+                # 更新总体平均订单等待时间（使用累积移动平均值）
+                if self._stats["total_orders"] > 0:
+                    prev_weight = self._stats["total_orders"] - len(self.current_batch_orders)
+                    new_weight = len(self.current_batch_orders)
+                    self._stats["avg_waiting_time"] = (
+                        (self._stats["avg_waiting_time"] * prev_weight + avg_batch_waiting_time * new_weight) /
+                        self._stats["total_orders"]
+                    )
+                else:
+                    self._stats["avg_waiting_time"] = avg_batch_waiting_time
+
+            # 准备订单信息，包含配送顺序
+            order_info = []
+            for order in self.current_batch_orders:
+                order_data = {
+                    "order_id": order.order_id,
+                    "table_id": order.table_id
+                }
+                # 添加配送顺序信息（如果有）
+                if hasattr(order, "delivery_sequence") and order.delivery_sequence is not None:
+                    order_data["delivery_sequence"] = order.delivery_sequence
+                order_info.append(order_data)
             
             # 记录本次配送批次的历史
             batch_record = {
-                "batch_id": self._stats["total_batches"],
-                "start_time": self.current_batch_start_time,
-                "end_time": end_time,
-                "duration": batch_time,
-                "orders_count": self._stats["current_batch_orders"] or 0,  # 确保至少为0
-                "path_length": len(self.path_history) - 1,
-                "is_ai_robot": self.is_ai_enhanced,
-                "orders": [{"order_id": o.order_id, "table_id": o.table_id} for o in self.current_batch_orders]
+                "batch_id": self.current_batch_id,
+                "total_time": calculated_time,  # 使用计算的时间
+                "path_length": path_length,
+                "avg_waiting_time": avg_batch_waiting_time,
+                "机器人类型": "智能RAG机器人" if self.is_ai_enhanced else "基础机器人",
+                "orders": order_info,
+                "餐厅布局": self.restaurant_name
             }
             self._delivery_history.append(batch_record)
             
-            logger.info(f"Robot #{self.robot_id} 完成配送周期，总时间: {total_time:.2f}秒，" 
-                       f"送达订单: {self._stats['current_batch_orders']}个，"
-                       f"路径长度: {len(self.path_history) - 1}")
+            logger.info(f"Robot #{self.robot_id} 完成配送周期，总配送时间: {batch_time:.2f}秒，" 
+                       f"送达订单: {len(self.current_batch_orders)}个，"
+                       f"路径长度: {path_length}")
             
             # 重置当前批次数据
             self.delivery_start_time = None
             self.current_batch_start_time = None
             self.current_batch_orders = []
-            self._stats["current_batch_orders"] = 0
-            self.current_batch_path_length = 0
 
     # ---------------- 其他 ---------------- #
     def simulate(self, max_step: int = 500) -> None:
@@ -423,24 +463,24 @@ class Robot:
         提供丰富的统计指标
         """
         stats = dict(self._stats)
-        
-        # 计算平均值
-        if stats["total_batches"] > 0:
-            stats["平均每批次订单数"] = stats["total_orders"] / stats["total_batches"]
-            if stats["total_orders"] > 0:
-                stats["平均每订单步数"] = stats["total_steps"] / stats["total_orders"]
-        
-        if stats["total_delivery_time"] > 0 and stats["total_orders"] > 0:
-            stats["平均每订单配送时间"] = stats["total_delivery_time"] / stats["total_orders"]
             
         # 添加路径信息
-        stats["总路径长度"] = len(self.path_history) - 1  # 减去初始位置
+        stats["总配送路程"] = len(self.path_history) - 1  # 减去初始位置
         
         # 添加机器人类型信息
         stats["机器人类型"] = "智能RAG机器人" if self.is_ai_enhanced else "基础机器人"
         
         # 添加历史配送记录
         stats["配送历史"] = self._delivery_history
+        
+        # 为未来扩展预留其他数据字段
+        stats["其他数据"] = {
+            "能源消耗": 0,       # 预留：机器人能源消耗
+            "障碍物处理次数": 0,   # 预留：遇到障碍物的次数
+            "等待操作次数": 0,     # 预留：等待操作的次数
+            "路径重规划次数": 0,   # 预留：路径重新规划的次数
+            "拥堵区域": [],       # 预留：餐厅拥堵区域
+        }
             
         return stats
 

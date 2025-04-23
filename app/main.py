@@ -5,6 +5,7 @@ Streamlit Web App 主页面逻辑
 import gc
 import streamlit as st
 import pandas as pd
+import time
 from .constants import logger
 from .utils import available_layouts
 from .ui import (
@@ -33,6 +34,8 @@ from .state import (
     set_editor_loaded,
     get_path_histories,
     set_path_histories,
+    reset_batch_histories,
+    get_batch_histories,
 )
 
 
@@ -140,9 +143,89 @@ def run():
 
             # Plotly统计可视化
             render_plotly_stats(stats)
-
-            # 扩展统计分析
-            render_plotly_stats_extended(stats)
+            
+            # 显示历史数据部分
+            batch_histories = get_batch_histories()
+            
+            # 历史数据部分
+            if batch_histories:  # 优先使用累积的历史批次数据
+                # 使用列布局放置标题和重置按钮
+                col1, col2 = st.columns([6, 1])
+                with col1:
+                    st.subheader("历史模拟数据")
+                with col2:
+                    st.write("")  # 添加空行以对齐按钮
+                    reset_btn = st.button("🔄", key="reset_batch_data", help="重置历史数据")
+                    if reset_btn:
+                        reset_batch_histories()
+                        st.success("已重置所有历史批次数据")
+                        st.rerun()
+                        
+                history_df = pd.DataFrame(batch_histories)
+                
+                # 显示友好的列名
+                display_columns = {
+                    "batch_id": "模拟轮数",
+                    "total_time": "配送完成时间",
+                    "path_length": "总配送路程",
+                    "avg_waiting_time": "平均订单等待时间",
+                    "机器人类型": "机器人类型",
+                    "餐厅布局": "餐厅布局"
+                }
+                
+                # 选择并重命名要显示的列
+                if history_df.empty:
+                    st.info("暂无历史数据")
+                else:
+                    display_df = history_df[[col for col in display_columns.keys() if col in history_df.columns]]
+                    display_df.columns = [display_columns[col] for col in display_df.columns]
+                    
+                    # 格式化数字列，去除单位
+                    for col in ["配送完成时间", "总配送路程", "平均订单等待时间"]:
+                        if col in display_df.columns:
+                            display_df[col] = display_df[col].apply(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
+                    
+                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+            elif "配送历史" in stats and stats["配送历史"]:  # 如果没有累积数据，使用当前模拟数据
+                col1, col2 = st.columns([6, 1])
+                with col1:
+                    st.subheader("历史数据")
+                with col2:
+                    st.write("")  # 添加空行以对齐按钮
+                    reset_btn = st.button("🔄", key="reset_batch_data", help="重置历史数据")
+                    if reset_btn:
+                        reset_batch_histories()
+                        st.success("已重置所有历史批次数据")
+                        st.rerun()
+                        
+                history_df = pd.DataFrame(stats["配送历史"])
+                
+                # 显示友好的列名
+                display_columns = {
+                    "batch_id": "模拟轮数",
+                    "total_time": "配送完成时间",
+                    "path_length": "总配送路程",
+                    "avg_waiting_time": "平均订单等待时间",
+                    "机器人类型": "机器人类型",
+                    "餐厅布局": "餐厅布局"
+                }
+                
+                # 选择并重命名要显示的列
+                if history_df.empty:
+                    st.info("暂无历史数据")
+                else:
+                    display_df = history_df[[col for col in display_columns.keys() if col in history_df.columns]]
+                    display_df.columns = [display_columns[col] for col in display_df.columns]
+                    
+                    # 格式化数字列，去除单位
+                    for col in ["配送完成时间", "总配送路程", "平均订单等待时间"]:
+                        if col in display_df.columns:
+                            display_df[col] = display_df[col].apply(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
+                    
+                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+            else:
+                st.subheader("历史数据")
+                st.info("暂无批次历史数据")
 
     with tab3:
         st.header("餐厅布局管理")

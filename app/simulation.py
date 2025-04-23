@@ -6,6 +6,7 @@ import random
 import time
 from .utils import build_robot, make_order
 from .constants import logger
+from .state import get_next_batch_id
 
 
 class SimulationEngine:
@@ -26,8 +27,8 @@ class SimulationEngine:
         self.stats = {
             "total_steps": 0,
             "total_orders": 0,
-            "total_batches": 0,
-            "total_delivery_time": 0
+            "total_time": 0,     # 总配送时间，目前与总步数相同
+            "avg_waiting_time": 0  # 新增：平均订单等待时间
         }
         self.path_histories = []
         self.assigned_orders = []
@@ -42,11 +43,14 @@ class SimulationEngine:
         Returns:
             dict: 模拟统计结果
         """
+        # 获取全局批次ID
+        batch_id = get_next_batch_id()
+        
         self.stats = {
             "total_steps": 0,
             "total_orders": 0,
-            "total_batches": 0,
-            "total_delivery_time": 0
+            "total_time": 0,     # 总配送时间，目前与总步数相同
+            "avg_waiting_time": 0  # 新增：平均订单等待时间
         }
         self.path_histories = []
         self.assigned_orders = []
@@ -55,7 +59,7 @@ class SimulationEngine:
         start_time = time.time()
         
         # 创建一个机器人实例
-        bot = build_robot(self.use_ai, self.restaurant.layout)
+        bot = build_robot(self.use_ai, self.restaurant.layout, restaurant_name=self.restaurant.name)
 
         # 跟踪已分配订单的桌子
         assigned_tables = set()
@@ -97,35 +101,65 @@ class SimulationEngine:
             bot.simulate()
             
             # 记录路径历史
+            order_info = []
+            for order in bot.all_assigned_orders:
+                order_data = {
+                    "order_id": order.order_id, 
+                    "table_id": order.table_id
+                }
+                # 添加配送顺序信息（如果有）
+                if hasattr(order, "delivery_sequence") and order.delivery_sequence is not None:
+                    order_data["delivery_sequence"] = order.delivery_sequence
+                order_info.append(order_data)
+                
             self.path_histories.append(
                 {
                     "robot_id": bot.robot_id,
                     "path": bot.path_history,
-                    "orders": [{"order_id": order.order_id, "table_id": order.table_id} for order in bot.all_assigned_orders]
+                    "orders": order_info
                 }
             )
             
             # 获取机器人统计信息，使用新的统计结构
             robot_stats = bot.stats()
             
-            # 复制主要统计数据
-            for key in ["total_steps", "total_orders", "total_batches", "total_delivery_time"]:
-                if key in robot_stats:
-                    self.stats[key] = robot_stats[key]
-            
-            # 复制计算的平均值
-            for key in ["平均每批次订单数", "平均每订单步数", "平均每订单配送时间"]:
+            # 复制关键统计数据
+            for key in ["total_steps", "total_orders", "total_time", "avg_waiting_time"]:
                 if key in robot_stats:
                     self.stats[key] = robot_stats[key]
             
             # 添加机器人类型信息
             self.stats["机器人类型"] = robot_stats.get("机器人类型", "基础机器人")
             
-            # 添加总路径长度
-            self.stats["总路径长度"] = robot_stats.get("总路径长度", 0)
+            # 添加总配送路程
+            self.stats["总配送路程"] = robot_stats.get("总配送路程", 0)
             
-            # 添加配送历史记录
-            self.stats["配送历史"] = robot_stats.get("配送历史", [])
+            # 处理配送历史
+            simplified_history = []
+            for record in robot_stats.get("delivery_history", []):
+                simplified_record = {
+                    "batch_id": batch_id,
+                    "total_time": record.get("total_time", 0),
+                    "path_length": record.get("path_length", 0),
+                    "avg_waiting_time": record.get("avg_waiting_time", 0),
+                    "机器人类型": record.get("机器人类型", "基础机器人"),
+                    "餐厅布局": record.get("餐厅布局", self.restaurant.name)
+                }
+                simplified_history.append(simplified_record)
+            
+            # 如果没有配送历史记录，创建一个基本记录
+            if not simplified_history and self.path_histories:
+                simplified_record = {
+                    "batch_id": batch_id,
+                    "total_time": self.stats.get("total_time", 0), 
+                    "path_length": self.stats.get("总配送路程", 0),
+                    "avg_waiting_time": self.stats.get("avg_waiting_time", 0),
+                    "机器人类型": self.stats.get("机器人类型", "基础机器人"),
+                    "餐厅布局": self.restaurant.name
+                }
+                simplified_history.append(simplified_record)
+                
+            self.stats["配送历史"] = simplified_history
 
         # 添加路径统计数据
         if self.path_histories:
@@ -133,10 +167,6 @@ class SimulationEngine:
             self.stats["平均路径长度"] = sum(path_lengths) / len(path_lengths)
             self.stats["最长路径"] = max(path_lengths)
             self.stats["最短路径"] = min(path_lengths)
-
-        # 添加性能统计
-        end_time = time.time()
-        self.stats["模拟时间(秒)"] = round(end_time - start_time, 2)
         
         # 添加分配订单的统计
         self.stats["分配订单总数"] = len(self.assigned_orders)

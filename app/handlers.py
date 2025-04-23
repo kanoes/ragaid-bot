@@ -8,6 +8,7 @@ from restaurant.restaurant_layout import RestaurantLayout
 from restaurant.restaurant import Restaurant
 from .utils import load_restaurant, save_restaurant_layout, delete_restaurant_layout
 from .simulation import SimulationEngine
+from .state import append_batch_histories
 
 
 def handle_layout_selection(layout_name):
@@ -67,4 +68,9 @@ def handle_simulation(restaurant, use_ai, num_orders):
         engine = SimulationEngine(restaurant, use_ai)
         # 运行模拟
         stats, path_histories = engine.run(num_orders)
+        
+        # 如果有新的配送历史记录，添加到累积历史数据中
+        if "配送历史" in stats and stats["配送历史"]:
+            append_batch_histories(stats["配送历史"])
+            
         return stats, path_histories
