@@ -41,12 +41,23 @@ class Order:
         self,
         order_id: int,
         table_id: str,
-        prep_time: int,
+        prep_time: float = 0,
+        ready_time: float = None,
         items: Optional[List[str]] = None,
     ) -> None:
+        """
+        初始化订单
+        
+        Args:
+            order_id: 订单ID
+            table_id: 桌号
+            prep_time: 准备时间（秒）
+            ready_time: 订单准备好的时间点（绝对时间，未来扩展用）
+        """
         self.order_id = order_id
         self.table_id = table_id
         self.prep_time = prep_time
+        self.ready_time = ready_time
         self.items = items or []
 
         self.status = OrderStatus.WAITING
@@ -54,9 +65,12 @@ class Order:
 
         # 时间戳
         self.prep_start_time: Optional[float] = None
-        self.ready_time: Optional[float] = None
         self.delivery_start_time: Optional[float] = None
         self.delivery_end_time: Optional[float] = None
+        self.delivery_complete_time: Optional[float] = None
+        self.delivery_success: Optional[bool] = None
+        self.is_assigned = False
+        self.assigned_robot_id: Optional[int] = None
 
     # ---- 状态流转 ----------------------------------------------------------
     def start_preparing(self) -> None:
@@ -132,7 +146,7 @@ class OrderManager:
         """
         新建订单并加入 waiting 队列
         """
-        order = Order(self._next_id, table_id, prep_time, items)
+        order = Order(self._next_id, table_id, prep_time)
         self._next_id += 1
         self._orders[order.order_id] = order
         self.waiting.append(order)
@@ -148,6 +162,9 @@ class OrderManager:
     def tick_kitchen(self) -> None:
         """
         模拟一次厨房时间片推进：准备完成 -> READY
+        
+        注意: 此方法当前未被直接引用，但保留作为未来扩展功能
+        主要用于多机器人场景下的订单准备过程模拟
         """
         now = time.time()
 
@@ -173,12 +190,18 @@ class OrderManager:
     def next_ready_order(self) -> Optional[Order]:
         """
         取队首可配送订单，不弹出
+        
+        注意: 此方法当前未被直接引用，但保留作为未来扩展功能
+        主要用于中心化调度场景下获取下一个待配送订单
         """
         return self.ready[0] if self.ready else None
 
     def assign_to_robot(self, order: Order) -> bool:
         """
         将订单指派给机器人
+        
+        注意: 此方法当前未被直接引用，但保留作为未来扩展功能
+        主要用于中心化调度场景下的订单分配
         """
         if order not in self.ready:
             return False

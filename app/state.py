@@ -212,6 +212,9 @@ def reset_editor():
 def get_editor_state():
     """
     获取完整的编辑器状态
+    
+    注意: 此函数当前未使用，但保留作为未来扩展点
+    用于导出/序列化编辑器状态，例如在持久化存储或API接口中
     """
     return {
         "editor_height": get_editor_height(),

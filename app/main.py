@@ -10,7 +10,6 @@ from .utils import available_layouts
 from .ui import (
     setup_page,
     render_stats,
-    render_plotly_restaurant_layout,
     render_plotly_restaurant_layout_no_cache,
     render_layout_editor,
     render_plotly_stats,
@@ -128,7 +127,7 @@ def run():
             render_plotly_robot_path(
                 restaurant,
                 path_histories[0]["path"],
-                robot_orientation=path_histories[0].get("orientation", 90),  # 使用保存的朝向
+                orders=path_histories[0].get("orders", []),
                 title=f"机器人 #{path_histories[0]['robot_id']} 配送路径（从停靠点出发并返回）",
             )
 

@@ -29,7 +29,7 @@ class RestaurantLayout:
         table_positions: Optional[Dict[str, Tuple[int, int]]] = None,
         kitchen_positions: Optional[List[Tuple[int, int]]] = None,
         parking_position: Optional[Tuple[int, int]] = None,
-        delivery_points: Optional[Dict[str, Tuple[Tuple[int, int], int]]] = None,
+        delivery_points: Optional[Dict[str, Tuple[int, int]]] = None,
     ) -> None:
         if grid is None:
             self.height: int = 10
@@ -44,9 +44,8 @@ class RestaurantLayout:
         self.kitchen: List[Tuple[int, int]] = kitchen_positions or []
         self.parking: Optional[Tuple[int, int]] = parking_position
         
-        # 每个桌子的送餐点和朝向，格式: {桌子ID: ((行, 列), 朝向角度)}
-        # 朝向角度: 0-上, 90-右, 180-下, 270-左
-        self.delivery_points: Dict[str, Tuple[Tuple[int, int], int]] = delivery_points or {}
+        # 每个桌子的送餐点，格式: {桌子ID: (行, 列)}
+        self.delivery_points: Dict[str, Tuple[int, int]] = delivery_points or {}
         
         # 如果没有预设送餐点，自动为每个桌子生成
         if not self.delivery_points:
@@ -54,28 +53,28 @@ class RestaurantLayout:
 
     def _generate_delivery_points(self) -> None:
         """
-        为每个桌子自动生成送餐点和朝向
+        为每个桌子自动生成送餐点
         优先选择北、东、南、西四个方向上最近的空闲点
         """
-        directions = [((-1, 0), 0), ((0, 1), 90), ((1, 0), 180), ((0, -1), 270)]  # (偏移量, 角度)
+        directions = [(-1, 0), (0, 1), (1, 0), (0, -1)]  # 上、右、下、左
         
         for table_id, table_pos in self.tables.items():
             row, col = table_pos
             
             # 尝试四个方向
-            for (dr, dc), angle in directions:
+            for dr, dc in directions:
                 delivery_pos = (row + dr, col + dc)
                 if self.is_free(delivery_pos):
-                    self.delivery_points[table_id] = (delivery_pos, angle)
+                    self.delivery_points[table_id] = delivery_pos
                     break
             
             # 如果四个直接相邻的点都不可用，尝试更远的点
             if table_id not in self.delivery_points:
                 for distance in range(2, 4):
-                    for (dr, dc), angle in directions:
+                    for dr, dc in directions:
                         delivery_pos = (row + dr * distance, col + dc * distance)
                         if self.is_free(delivery_pos):
-                            self.delivery_points[table_id] = (delivery_pos, angle)
+                            self.delivery_points[table_id] = delivery_pos
                             break
                     if table_id in self.delivery_points:
                         break
@@ -97,15 +96,15 @@ class RestaurantLayout:
         cand = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
         return [p for p in cand if self.is_free(p)]
         
-    def get_delivery_point(self, table_id: str) -> Optional[Tuple[Tuple[int, int], int]]:
+    def get_delivery_point(self, table_id: str) -> Optional[Tuple[int, int]]:
         """
-        获取特定桌子的送餐点和朝向
+        获取特定桌子的送餐点
         
         Args:
             table_id: 桌子ID
             
         Returns:
-            Tuple[Tuple[int, int], int]: (送餐点坐标, 朝向角度)
+            Tuple[int, int]: 送餐点坐标
             如果桌子不存在或没有送餐点，返回None
         """
         return self.delivery_points.get(table_id)

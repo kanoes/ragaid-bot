@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import List
+from typing import List, Dict, Any
 
 from .llm_client import LLMClient
 from .knowledge_base import KnowledgeBase
@@ -44,32 +44,17 @@ class RAGModule:
         """
         return self.retriever is not None
 
-    def obstacle_decision(
-        self,
-        robot_id: int,
-        position,
-        goal,
-        obstacle,
-    ) -> str:
+    def obstacle_decision(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        障碍决策
+        获取面对障碍时的决策方案
+        
+        注意: 此方法当前未使用，但保留作为未来扩展点，用于处理机器人遇到障碍时的特殊决策
+        
+        Args:
+            context: 决策上下文，包含机器人状态、障碍物信息等
+            
+        Returns:
+            dict: 决策结果，包含行动建议
         """
-        query = PromptHelper.build_obstacle_query(robot_id, position, goal, obstacle)
-
-        # 检索知识
-        know: List[str] = (
-            self.retriever.retrieve(query, self.top_k) if self.retriever else []
-        )
-
-        system_prompt = (
-            "You are an intelligent delivery‑robot assistant. "
-            "Given context and knowledge, return ONLY one of: "
-            "`reroute`, `wait`, `report_unreachable`."
-        )
-        knowledge_block = "\n".join(f"- {k}" for k in know)
-        user_prompt = f"{query}\n\nKnowledge:\n{knowledge_block}" if know else query
-
-        raw_decision = self.llm.chat(
-            system_prompt, user_prompt, temperature=0.0, max_tokens=16
-        )
-        return PromptHelper.simplify(raw_decision)
+        query = self._format_obstacle_prompt(context)
+        return self._get_rag_decision(query)

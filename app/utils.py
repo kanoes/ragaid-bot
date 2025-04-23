@@ -306,7 +306,7 @@ def build_robot(use_ai, layout):
         robot = Robot(layout, robot_id=1)
         
     # 设置机器人的目标容忍参数
-    robot.GOAL_TOLERANCE = 1  # 允许1格的误差范围
+    robot.GOAL_TOLERANCE = 0  # 必须到达确切位置才算送达
     
     return robot
 

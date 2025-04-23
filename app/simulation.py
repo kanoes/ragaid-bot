@@ -23,7 +23,12 @@ class SimulationEngine:
         """
         self.restaurant = restaurant
         self.use_ai = use_ai
-        self.stats = {"delivered": 0, "failed": 0}
+        self.stats = {
+            "total_steps": 0,
+            "total_orders": 0,
+            "total_batches": 0,
+            "total_delivery_time": 0
+        }
         self.path_histories = []
         self.assigned_orders = []
 
@@ -37,7 +42,12 @@ class SimulationEngine:
         Returns:
             dict: 模拟统计结果
         """
-        self.stats = {"delivered": 0, "failed": 0}
+        self.stats = {
+            "total_steps": 0,
+            "total_orders": 0,
+            "total_batches": 0,
+            "total_delivery_time": 0
+        }
         self.path_histories = []
         self.assigned_orders = []
 
@@ -59,7 +69,7 @@ class SimulationEngine:
         # 生成并分配所有订单
         orders_created = 0
         attempts = 0
-        max_attempts = num_orders * 3  # 防止死循环
+        max_attempts = num_orders * 3
         
         while orders_created < num_orders and attempts < max_attempts:
             attempts += 1
@@ -81,9 +91,6 @@ class SimulationEngine:
                 self.assigned_orders.append(order)
                 assigned_tables.add(table_id)
                 orders_created += 1
-            else:
-                logger.error(f"订单 #{order.order_id} 无法配送")
-                self.stats["failed"] += 1
         
         # 执行模拟
         if self.assigned_orders:
@@ -94,24 +101,31 @@ class SimulationEngine:
                 {
                     "robot_id": bot.robot_id,
                     "path": bot.path_history,
-                    "orientation": getattr(bot, "orientation", 90),  # 保存机器人的朝向
                     "orders": [{"order_id": order.order_id, "table_id": order.table_id} for order in bot.all_assigned_orders]
                 }
             )
             
-            # 获取机器人统计信息
+            # 获取机器人统计信息，使用新的统计结构
             robot_stats = bot.stats()
-            self.stats["delivered"] = robot_stats["delivered"]
-            self.stats["failed"] = robot_stats.get("failed", 0)
             
-            # 添加配送周期时间统计
-            if "total_delivery_time" in robot_stats:
-                self.stats["配送周期时间(秒)"] = round(robot_stats["total_delivery_time"], 2)
-                self.stats["配送订单数量"] = robot_stats.get("total_orders_delivered", 0)
-                if self.stats["配送订单数量"] > 0:
-                    self.stats["平均每单配送时间(秒)"] = round(
-                        robot_stats["total_delivery_time"] / self.stats["配送订单数量"], 2
-                    )
+            # 复制主要统计数据
+            for key in ["total_steps", "total_orders", "total_batches", "total_delivery_time"]:
+                if key in robot_stats:
+                    self.stats[key] = robot_stats[key]
+            
+            # 复制计算的平均值
+            for key in ["平均每批次订单数", "平均每订单步数", "平均每订单配送时间"]:
+                if key in robot_stats:
+                    self.stats[key] = robot_stats[key]
+            
+            # 添加机器人类型信息
+            self.stats["机器人类型"] = robot_stats.get("机器人类型", "基础机器人")
+            
+            # 添加总路径长度
+            self.stats["总路径长度"] = robot_stats.get("总路径长度", 0)
+            
+            # 添加配送历史记录
+            self.stats["配送历史"] = robot_stats.get("配送历史", [])
 
         # 添加路径统计数据
         if self.path_histories:
