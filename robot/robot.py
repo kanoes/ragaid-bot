@@ -341,14 +341,27 @@ class Robot:
         """
         计算从停靠点出发到返回停靠点的总时间和统计数据
         """
-        if self.delivery_start_time is not None and self.current_batch_start_time is not None:
+        if self.delivery_start_time is not None:
             end_time = time.time()
-            batch_time = end_time - self.current_batch_start_time
+            batch_time = 0
+            
+            # 计算本次批次的时间，如果有批次开始时间
+            if self.current_batch_start_time is not None:
+                batch_time = end_time - self.current_batch_start_time
+            else:
+                # 如果没有批次开始时间，则使用配送开始时间
+                batch_time = end_time - self.delivery_start_time
+                self.current_batch_start_time = self.delivery_start_time  # 确保有批次开始时间
+            
             total_time = end_time - self.delivery_start_time
             
             # 更新统计数据
             self._stats["total_delivery_time"] += total_time
             self._stats["total_steps"] += len(self.path_history) - 1  # 减去初始位置
+            
+            # 确保至少有一个批次
+            if self._stats["total_batches"] == 0:
+                self._stats["total_batches"] = 1
             
             # 记录本次配送批次的历史
             batch_record = {
@@ -356,7 +369,7 @@ class Robot:
                 "start_time": self.current_batch_start_time,
                 "end_time": end_time,
                 "duration": batch_time,
-                "orders_count": self._stats["current_batch_orders"],
+                "orders_count": self._stats["current_batch_orders"] or 0,  # 确保至少为0
                 "path_length": len(self.path_history) - 1,
                 "is_ai_robot": self.is_ai_enhanced,
                 "orders": [{"order_id": o.order_id, "table_id": o.table_id} for o in self.current_batch_orders]
@@ -377,6 +390,10 @@ class Robot:
     # ---------------- 其他 ---------------- #
     def simulate(self, max_step: int = 500) -> None:
         step = 0
+        # 记录配送开始时间（如果尚未设置）
+        if self.delivery_start_time is None:
+            self.delivery_start_time = time.time()
+            
         # 如果处于批处理模式，先等待批处理窗口关闭
         if self.batch_processing:
             self.batch_processing = False
@@ -394,6 +411,10 @@ class Robot:
             while self.path and step < max_step:
                 self.tick()
                 step += 1
+        
+        # 如果模拟结束时没有到达停靠点，确保记录配送周期
+        if not self.returning_to_parking and self.delivery_start_time is not None:
+            self._calculate_delivery_cycle_time()
                 
         logging.debug("simulate finished: %s steps", step)
 

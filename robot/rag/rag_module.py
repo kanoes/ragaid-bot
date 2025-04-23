@@ -58,3 +58,73 @@ class RAGModule:
         """
         query = self._format_obstacle_prompt(context)
         return self._get_rag_decision(query)
+    
+    def query_answer(self, query: str, use_rag: bool = True) -> str:
+        """
+        问答功能
+        
+        根据用户查询生成回答，可选择是否使用RAG增强
+        
+        Args:
+            query: 用户问题
+            use_rag: 是否使用检索增强
+            
+        Returns:
+            str: LLM回答
+        """
+        context = []
+        if use_rag and self.is_ready():
+            # 检索相关文档
+            context = self._get_rag_context(query)
+            
+        # 构建系统提示
+        system_prompt = "你是一个知识丰富的助手，请依据提供的上下文回答问题。"
+        if context:
+            # 将检索到的文档添加到系统提示中
+            system_prompt += "\n\n相关参考信息:\n" + "\n\n".join([f"- {doc}" for doc in context])
+        
+        # 调用LLM生成回答
+        return self.llm.chat(system=system_prompt, user=query)
+    
+    # ---------------- 私有 ---------------- #
+    def _get_rag_context(self, query: str) -> List[str]:
+        """
+        获取RAG上下文
+        
+        使用检索器从知识库中找出与查询最相关的文档
+        
+        Args:
+            query: 用户问题
+            
+        Returns:
+            List[str]: 检索到的相关文档列表
+        """
+        if self.retriever:
+            return self.retriever.retrieve(query, self.top_k)
+        return []
+    
+    def _format_obstacle_prompt(self, context: Dict[str, Any]) -> str:
+        """格式化障碍物提示词"""
+        return PromptHelper.build_obstacle_query(
+            robot_id=context.get("robot_id", 0),
+            position=context.get("position", (0, 0)),
+            goal=context.get("goal", (0, 0)),
+            obstacle=context.get("obstacle", (0, 0)),
+        )
+    
+    def _get_rag_decision(self, query: str) -> Dict[str, Any]:
+        """基于RAG获取决策结果"""
+        context = self._get_rag_context(query) if self.is_ready() else []
+        
+        system_prompt = "你是机器人控制器，依据情境给出最佳决策。"
+        if context:
+            system_prompt += "\n\n参考知识：\n" + "\n".join([f"- {doc}" for doc in context])
+        
+        decision = self.llm.chat(system=system_prompt, user=query)
+        simplified = PromptHelper.simplify(decision)
+        
+        return {
+            "action": simplified,
+            "raw_response": decision,
+            "context_used": bool(context),
+        }

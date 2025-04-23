@@ -317,7 +317,7 @@ def render_stats(stats):
         history_df = pd.DataFrame(stats["配送历史"])
         
         # 格式化时间戳为易读格式
-        if "start_time" in history_df.columns and "end_time" in history_df.columns:
+        if len(history_df) > 0 and "start_time" in history_df.columns and "end_time" in history_df.columns:
             history_df["开始时间"] = history_df["start_time"].apply(
                 lambda x: time.strftime("%H:%M:%S", time.localtime(x)) if x else ""
             )
@@ -340,6 +340,10 @@ def render_stats(stats):
             display_df.columns = [display_columns[col] for col in display_df.columns]
             
             st.dataframe(display_df, use_container_width=True)
+        else:
+            st.info("配送历史数据格式不完整，无法显示详细信息")
+    else:
+        st.info("暂无配送历史数据，请先运行模拟")
 
 
 @st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
@@ -857,7 +861,7 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
 
     with tabs[2]:
         # 批次历史分析
-        if "配送历史" in stats_data and stats_data["配送历史"]:
+        if "配送历史" in stats_data and stats_data["配送历史"] and len(stats_data["配送历史"]) > 0:
             # 将历史数据转换为DataFrame进行分析
             history_df = pd.DataFrame(stats_data["配送历史"])
             
@@ -924,7 +928,7 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                 )
                 st.plotly_chart(fig_duration, use_container_width=True)
         else:
-            st.info("暂无批次历史数据")
+            st.info("暂无批次历史数据，请先运行模拟并确保机器人完成了配送周期。")
 
     return data
 
@@ -943,7 +947,7 @@ def render_layout_editor():
     with col1:
         current_height = get_editor_height()
         new_height = st.number_input(
-            "高度", min_value=3, max_value=30, value=current_height
+            "高度", min_value=3, max_value=30, value=current_height, key="editor_height_input"
         )
         if new_height != current_height:
             # 调整高度时保留现有数据
@@ -974,7 +978,7 @@ def render_layout_editor():
     with col2:
         current_width = get_editor_width()
         new_width = st.number_input(
-            "宽度", min_value=3, max_value=30, value=current_width
+            "宽度", min_value=3, max_value=30, value=current_width, key="editor_width_input"
         )
         if new_width != current_width:
             # 调整宽度时保留现有数据
@@ -1004,7 +1008,7 @@ def render_layout_editor():
 
     with col3:
         current_name = get_editor_layout_name()
-        layout_name = st.text_input("布局名称", value=current_name)
+        layout_name = st.text_input("布局名称", value=current_name, key="editor_layout_name_input")
         if layout_name != current_name:
             set_editor_layout_name(layout_name)
 
@@ -1012,124 +1016,78 @@ def render_layout_editor():
     st.subheader("编辑布局")
     st.write("点击网格单元格来修改其类型")
 
-    # 选择要编辑的元素类型
-    element_type = st.radio(
-        "选择元素类型", ["墙壁/障碍", "空地", "桌子", "厨房", "停靠点"], horizontal=True
-    )
-
-    # 元素类型映射到数值
-    type_map = {"墙壁/障碍": 1, "空地": 0, "桌子": 2, "厨房": 3, "停靠点": 4}
-
-    # 在桌子模式下，需要输入桌子ID
-    table_id = None
-    if element_type == "桌子":
-        table_id = st.text_input("桌子ID (单个字母A-Z)", max_chars=1)
-
-    # 创建Plotly图表以便交互编辑
-    fig = render_plotly_editor_grid()
-
-    # 直接使用 plotly_events 展示图表并监听点击事件
-    clicked_point = plotly_events(fig, click_event=True, key="layout_editor")
-    if clicked_point:
-        # 获取点击的坐标
-        try:
-            point_data = clicked_point[0]
-            row, col = int(point_data["y"]), int(point_data["x"])
-
-            # 获取当前状态
-            grid = get_editor_grid()
-            tables = get_editor_tables()
-            kitchen = get_editor_kitchen()
-            parking = get_editor_parking()
-            height = get_editor_height()
-            width = get_editor_width()
-
-            # 根据选择的元素类型进行修改
-            if 0 <= row < height and 0 <= col < width:
-                if (
-                    element_type == "桌子"
-                    and table_id
-                    and table_id.isalpha()
-                    and len(table_id) == 1
-                ):
-                    # 处理桌子 - 需要存储桌子ID和位置
-                    grid[row][col] = type_map[element_type]
-                    tables[table_id.upper()] = (row, col)
-                    set_editor_tables(tables)
-                elif element_type == "厨房":
-                    # 处理厨房 - 可以有多个厨房位置
-                    grid[row][col] = type_map[element_type]
-                    if (row, col) not in kitchen:
-                        kitchen.append((row, col))
-                    set_editor_kitchen(kitchen)
-                elif element_type == "停靠点":
-                    # 处理停靠点 - 只能有一个
-                    # 先清除现有的停靠点
-                    if parking:
-                        old_row, old_col = parking
-                        if grid[old_row][old_col] == 4:
-                            grid[old_row][old_col] = 0
-
-                    grid[row][col] = type_map[element_type]
-                    set_editor_parking((row, col))
-                else:
-                    # 处理墙壁或空地
-                    grid[row][col] = type_map[element_type]
-
-                    # 如果将某个特殊位置设为墙壁或空地，需要从相应列表中移除
-                    # 检查和清理桌子
-                    tables_to_remove = []
-                    for tid, pos in tables.items():
-                        if pos == (row, col) and grid[row][col] != 2:
-                            tables_to_remove.append(tid)
-                    for tid in tables_to_remove:
-                        del tables[tid]
-                    set_editor_tables(tables)
-
-                    # 检查和清理厨房
-                    if (row, col) in kitchen and grid[row][col] != 3:
-                        kitchen.remove((row, col))
-                        set_editor_kitchen(kitchen)
-
-                    # 检查和清理停靠点
-                    if parking == (row, col) and grid[row][col] != 4:
-                        set_editor_parking(None)
-
-                # 更新网格
-                set_editor_grid(grid)
-
-                # 强制重新渲染
-                st.rerun()
-        except (KeyError, IndexError) as e:
-            st.error(f"无法处理点击: {e}")
-
-    # 保存、重置和自动围墙按钮
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button("保存布局"):
-            # 验证布局是否有效
-            if not validate_layout():
-                st.error("布局无效! 需要至少一个桌子、厨房和停靠点")
-                return None
-
-            # 返回当前编辑的布局数据
-            return {
-                "name": get_editor_layout_name(),
-                "grid": get_editor_grid(),
-                "table_positions": get_editor_tables(),
-                "kitchen_positions": get_editor_kitchen(),
-                "parking_position": get_editor_parking(),
-            }
-
-    with col2:
-        if st.button("重置布局"):
+    # 创建多行列布局，美化界面
+    edit_col1, edit_col2 = st.columns([3, 1])
+    
+    with edit_col2:
+        st.write("**元素工具箱**")
+        # 选择要编辑的元素类型
+        element_type = st.radio(
+            "选择元素类型", 
+            ["墙壁/障碍", "空地", "桌子", "厨房", "停靠点"],
+            captions=["#", ".", "A-Z", "厨", "停"],
+            key="element_type_radio"
+        )
+        
+        # 元素类型映射到数值
+        type_map = {"墙壁/障碍": 1, "空地": 0, "桌子": 2, "厨房": 3, "停靠点": 4}
+        
+        # 显示当前元素的颜色提示
+        element_colors = {
+            "墙壁/障碍": "#333333",
+            "空地": "white",
+            "桌子": "#00cc66",
+            "厨房": "#f5c518",
+            "停靠点": "#4da6ff"
+        }
+        
+        st.markdown(
+            f"""
+            <div style="
+                width: 100%; 
+                height: 30px; 
+                background-color: {element_colors[element_type]}; 
+                border: 1px solid black;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: {"black" if element_type != "墙壁/障碍" else "white"};
+                font-weight: bold;
+            ">
+                {element_type}
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+        
+        # 在桌子模式下，需要输入桌子ID
+        table_id = None
+        if element_type == "桌子":
+            table_id = st.text_input("桌子ID (单个字母A-Z)", max_chars=1, key="table_id_input")
+            if table_id and (not table_id.isalpha() or len(table_id) != 1):
+                st.warning("桌子ID必须是单个字母 (A-Z)")
+                
+        # 显示统计信息
+        st.write("**布局统计**")
+        tables = get_editor_tables()
+        kitchen = get_editor_kitchen()
+        parking = get_editor_parking()
+        
+        st.markdown(f"""
+        - 网格尺寸: {get_editor_height()} × {get_editor_width()}
+        - 桌子: {len(tables)} 个
+        - 厨房: {len(kitchen)} 个
+        - 停靠点: {"有" if parking else "无"}
+        """)
+        
+        # 操作按钮
+        st.write("**操作**")
+        if st.button("重置布局", key="editor_reset_button"):
             # 重置为空白布局
             reset_editor()
             st.rerun()
-
-    with col3:
-        if st.button("自动添加围墙"):
+            
+        if st.button("自动添加围墙", key="editor_add_walls_button"):
             # 在布局边缘添加墙壁
             grid = get_editor_grid()
             height = get_editor_height()
@@ -1147,15 +1105,135 @@ def render_layout_editor():
 
             # 更新网格
             set_editor_grid(grid)
-
             st.rerun()
+    
+    with edit_col1:
+        # 创建Plotly图表以便交互编辑
+        fig = render_interactive_editor_grid()
+        
+        # 使用 plotly_events 展示图表并监听点击事件
+        clicked_point = plotly_events(fig, click_event=True, key="layout_editor_plotly")
+        
+        if clicked_point:
+            # 获取点击的坐标
+            try:
+                point_data = clicked_point[0]
+                row, col = int(point_data["y"]), int(point_data["x"])
+                
+                # 获取当前状态
+                grid = get_editor_grid()
+                tables = get_editor_tables()
+                kitchen = get_editor_kitchen()
+                parking = get_editor_parking()
+                height = get_editor_height()
+                width = get_editor_width()
+
+                # 根据选择的元素类型进行修改
+                if 0 <= row < height and 0 <= col < width:
+                    if (
+                        element_type == "桌子"
+                        and table_id
+                        and table_id.isalpha()
+                        and len(table_id) == 1
+                    ):
+                        # 处理桌子 - 需要存储桌子ID和位置
+                        # 先检查该ID是否已被使用
+                        table_id_upper = table_id.upper()
+                        if table_id_upper in tables and tables[table_id_upper] != (row, col):
+                            # 如果已存在此ID但位置不同，找到并清除旧位置
+                            old_row, old_col = tables[table_id_upper]
+                            if grid[old_row][old_col] == 2:  # 确保旧位置确实是桌子
+                                grid[old_row][old_col] = 0  # 设为空地
+                                
+                        # 检查该位置是否已有其他桌子
+                        table_to_remove = None
+                        for tid, pos in tables.items():
+                            if pos == (row, col) and tid != table_id_upper:
+                                table_to_remove = tid
+                        if table_to_remove:
+                            del tables[table_to_remove]
+                                
+                        grid[row][col] = type_map[element_type]
+                        tables[table_id_upper] = (row, col)
+                        set_editor_tables(tables)
+                    elif element_type == "厨房":
+                        # 处理厨房 - 可以有多个厨房位置
+                        grid[row][col] = type_map[element_type]
+                        if (row, col) not in kitchen:
+                            kitchen.append((row, col))
+                        set_editor_kitchen(kitchen)
+                    elif element_type == "停靠点":
+                        # 处理停靠点 - 只能有一个
+                        # 先清除现有的停靠点
+                        if parking:
+                            old_row, old_col = parking
+                            if grid[old_row][old_col] == 4:
+                                grid[old_row][old_col] = 0  # 设为空地
+
+                        grid[row][col] = type_map[element_type]
+                        set_editor_parking((row, col))
+                    else:
+                        # 处理墙壁或空地
+                        old_value = grid[row][col]
+                        grid[row][col] = type_map[element_type]
+
+                        # 如果将某个特殊位置设为墙壁或空地，需要从相应列表中移除
+                        # 检查和清理桌子
+                        if old_value == 2:  # 原来是桌子
+                            tables_to_remove = []
+                            for tid, pos in tables.items():
+                                if pos == (row, col):
+                                    tables_to_remove.append(tid)
+                            for tid in tables_to_remove:
+                                del tables[tid]
+                            set_editor_tables(tables)
+
+                        # 检查和清理厨房
+                        if old_value == 3 and (row, col) in kitchen:  # 原来是厨房
+                            kitchen.remove((row, col))
+                            set_editor_kitchen(kitchen)
+
+                        # 检查和清理停靠点
+                        if old_value == 4 and parking == (row, col):  # 原来是停靠点
+                            set_editor_parking(None)
+
+                    # 更新网格
+                    set_editor_grid(grid)
+
+                    # 强制重新渲染
+                    st.rerun()
+            except (KeyError, IndexError) as e:
+                st.error(f"无法处理点击: {e}")
+    
+    # 保存布局按钮
+    st.write("")
+    save_col1, save_col2 = st.columns([3, 1])
+    
+    with save_col1:
+        st.write("**完成布局编辑后，点击保存：**")
+        
+    with save_col2:
+        if st.button("保存布局", key="editor_save_layout_button", type="primary"):
+            # 验证布局是否有效
+            is_valid, message = validate_layout_extended()
+            if not is_valid:
+                st.error(f"布局无效! {message}")
+                return None
+
+            # 返回当前编辑的布局数据
+            return {
+                "name": get_editor_layout_name(),
+                "grid": get_editor_grid(),
+                "table_positions": get_editor_tables(),
+                "kitchen_positions": get_editor_kitchen(),
+                "parking_position": get_editor_parking(),
+            }
 
     return None
 
-
-def render_plotly_editor_grid():
+def render_interactive_editor_grid():
     """
-    渲染可编辑的Plotly餐厅布局网格
+    渲染交互式可编辑的Plotly餐厅布局网格，改进版本
 
     返回:
         go.Figure: Plotly图表对象
@@ -1163,32 +1241,34 @@ def render_plotly_editor_grid():
     grid = get_editor_grid()
     height = get_editor_height()
     width = get_editor_width()
+    tables = get_editor_tables()
+    kitchen = get_editor_kitchen()
+    parking = get_editor_parking()
 
     # 创建颜色映射
     colormap = {
-        0: "white",  # 空地
-        1: "#333333",  # 墙壁/障碍
-        2: "#00cc66",  # 桌子
-        3: "#f5c518",  # 厨房
-        4: "#4da6ff",  # 停靠点
+        0: "white",         # 空地
+        1: "#333333",       # 墙壁/障碍
+        2: "#00cc66",       # 桌子
+        3: "#f5c518",       # 厨房
+        4: "#4da6ff",       # 停靠点
     }
 
     # 创建标签映射
     labels = [["" for _ in range(width)] for _ in range(height)]
 
     # 设置桌子标签
-    for table_id, pos in get_editor_tables().items():
+    for table_id, pos in tables.items():
         row, col = pos
         if 0 <= row < height and 0 <= col < width:  # 防止越界
             labels[row][col] = table_id
 
     # 设置厨房标签
-    for row, col in get_editor_kitchen():
+    for row, col in kitchen:
         if 0 <= row < height and 0 <= col < width:  # 防止越界
             labels[row][col] = "厨"
 
     # 设置停靠点标签
-    parking = get_editor_parking()
     if parking:
         row, col = parking
         if 0 <= row < height and 0 <= col < width:  # 防止越界
@@ -1200,17 +1280,27 @@ def render_plotly_editor_grid():
     # 添加热力图 - 显示颜色块
     heatmap_z = np.array(grid)
     colorscale = [
-        [0, colormap[0]],
+        [0, colormap[0]],      # 空地
         [0.2, colormap[0]],
-        [0.2, colormap[1]],
+        [0.2, colormap[1]],    # 墙壁
         [0.4, colormap[1]],
-        [0.4, colormap[2]],
+        [0.4, colormap[2]],    # 桌子
         [0.6, colormap[2]],
-        [0.6, colormap[3]],
+        [0.6, colormap[3]],    # 厨房
         [0.8, colormap[3]],
-        [0.8, colormap[4]],
+        [0.8, colormap[4]],    # 停靠点
         [1.0, colormap[4]],
     ]
+
+    # 生成每个单元格的悬停文本
+    hover_texts = []
+    for i in range(height):
+        row_texts = []
+        for j in range(width):
+            cell_type = grid[i][j]
+            cell_desc = get_cell_description(i, j)
+            row_texts.append(cell_desc)
+        hover_texts.append(row_texts)
 
     fig.add_trace(
         go.Heatmap(
@@ -1218,10 +1308,9 @@ def render_plotly_editor_grid():
             colorscale=colorscale,
             showscale=False,
             hoverinfo="text",
-            text=[
-                [get_cell_description(i, j) for j in range(width)]
-                for i in range(height)
-            ],
+            hovertext=hover_texts,
+            # 禁用默认的heatmap tooltips
+            zhoverformat="none"
         )
     )
 
@@ -1234,36 +1323,38 @@ def render_plotly_editor_grid():
                     y=i,
                     text=labels[i][j],
                     showarrow=False,
-                    font=dict(size=14, color="black", family="Arial Black"),
+                    font=dict(
+                        size=16, 
+                        color="black", 
+                        family="Arial Black"
+                    ),
                 )
 
     # 设置图表布局
     fig.update_layout(
-        width=min(700, width * 40),  # 限制最大宽度
-        height=min(700, height * 40),  # 限制最大高度
+        width=min(800, max(400, width * 35)),  # 更合理的大小调整
+        height=min(800, max(400, height * 35)),
         margin=dict(l=0, r=0, t=10, b=0),
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(
-            showgrid=True,
-            gridcolor="lightgrey",
-            gridwidth=1,
+            showgrid=False,  # 不显示网格线，我们会自己添加
             zeroline=False,
             range=[-0.5, width - 0.5],
             tickvals=list(range(width)),
             ticktext=[str(i) for i in range(width)],
+            tickfont=dict(size=10),
         ),
         yaxis=dict(
-            showgrid=True,
-            gridcolor="lightgrey",
-            gridwidth=1,
+            showgrid=False,  # 不显示网格线，我们会自己添加
             zeroline=False,
             scaleanchor="x",
             scaleratio=1,
             range=[height - 0.5, -0.5],  # 反转Y轴使(0,0)在左上角
             tickvals=list(range(height)),
             ticktext=[str(i) for i in range(height)],
+            tickfont=dict(size=10),
         ),
-        # 添加国际象棋棋盘样式的背景网格
+        # 添加棋盘样式网格
         shapes=[
             # 水平线
             *[dict(
@@ -1279,10 +1370,50 @@ def render_plotly_editor_grid():
                 y0=-0.5, y1=height-0.5,
                 line=dict(color="lightgrey", width=1)
             ) for j in range(width+1)]
-        ]
+        ],
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=14,
+            font_family="Arial"
+        )
+    )
+
+    # 添加额外的指导性提示
+    fig.add_annotation(
+        xref="paper", yref="paper",
+        x=0.5, y=-0.07,
+        text="点击任意单元格应用当前选择的元素类型",
+        showarrow=False,
+        font=dict(size=12, color="grey"),
     )
 
     return fig
+
+
+def validate_layout_extended():
+    """
+    验证布局是否有效，并提供详细的错误信息
+    
+    返回:
+        tuple: (is_valid, message) 布局是否有效及详细信息
+    """
+    # 检查是否至少有一个桌子
+    if not get_editor_tables():
+        return False, "至少需要一个桌子"
+
+    # 检查是否至少有一个厨房
+    if not get_editor_kitchen():
+        return False, "至少需要一个厨房"
+
+    # 检查是否有停靠点
+    if not get_editor_parking():
+        return False, "需要一个停靠点"
+        
+    # 检查布局名称
+    if not get_editor_layout_name() or get_editor_layout_name() == "新布局":
+        return False, "请提供有效的布局名称"
+
+    return True, "布局有效"
 
 
 def get_cell_description(row, col):
@@ -1305,25 +1436,6 @@ def get_cell_description(row, col):
                 return f"{base_desc} {tid}"
 
     return base_desc
-
-
-def validate_layout():
-    """
-    验证布局是否有效
-    """
-    # 检查是否至少有一个桌子
-    if not get_editor_tables():
-        return False
-
-    # 检查是否至少有一个厨房
-    if not get_editor_kitchen():
-        return False
-
-    # 检查是否有停靠点
-    if not get_editor_parking():
-        return False
-
-    return True
 
 
 def render_plotly_restaurant_layout_no_cache(_restaurant, path=None, title="餐厅布局"):
