@@ -10,7 +10,6 @@ import os
 from typing import List
 
 import faiss
-import numpy as np
 
 from .llm_client import LLMClient
 

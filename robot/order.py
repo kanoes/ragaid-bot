@@ -1,123 +1,19 @@
 """
-机器人主体（调度层）
-路径规划 & 订单管理组件
+订单管理组件
 
-* PathPlanner ：A* 算法，负责在 `RestaurantLayout` 上寻找最短路径
-* Order / OrderManager ：订单生命周期、状态管理
-
-该文件合并“路径规划 + 订单调度”两类功能，是因为它们都属于
-“planning（计划层）”—— 跟 Robot 的动作执行层分离。
+* Order: 订单实体及生命周期
+* OrderStatus: 订单状态枚举
+* OrderManager: 订单队列管理
 """
 
 from __future__ import annotations
 
-import heapq
 import logging
 import time
 from enum import Enum, auto
-from typing import Dict, List, Optional, Tuple
-
-from restaurant.restaurant_layout import RestaurantLayout
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
-
-# --------------------------------------------------------------------------- #
-# 路径规划 – A* 实现
-# --------------------------------------------------------------------------- #
-class PathPlanner:
-    """
-    基于 A* 的网格路径规划器
-    """
-
-    def __init__(self, layout: RestaurantLayout) -> None:
-        self.layout = layout
-
-    # ---- A* ----------------------------------------------------------------
-    @staticmethod
-    def _heuristic(a: Tuple[int, int], b: Tuple[int, int]) -> int:
-        """
-        曼哈顿距离启发函数
-        """
-        return abs(a[0] - b[0]) + abs(a[1] - b[1])
-
-    def find_path(
-        self,
-        start: Tuple[int, int],
-        goal: Tuple[int, int],
-        allow_expand: bool = True,
-    ) -> Optional[List[Tuple[int, int]]]:
-        """
-        搜索从 *start* 到 *goal* 的路径
-        若目标四邻域被完全阻塞且 `allow_expand=True`
-        将在 2–3 曼哈顿距离半径内寻找最近可达点作为临时目标
-        """
-        logger.debug("路径规划: %s -> %s", start, goal)
-
-        # 若四邻域可达直接 A*
-        if any(
-            self.layout.is_free((goal[0] + dx, goal[1] + dy))
-            for dx, dy in ((0, 1), (1, 0), (0, -1), (-1, 0))
-        ):
-            return self._a_star(start, goal)
-
-        if not allow_expand:
-            logger.warning("目标被围堵且不允许扩圈搜索")
-            return None
-
-        logger.warning("目标周围被封锁，扩大搜索半径")
-        for radius in range(2, 4):  # 半径 2~3
-            for dx in range(-radius, radius + 1):
-                for dy in range(-radius, radius + 1):
-                    if abs(dx) + abs(dy) > radius:
-                        continue
-                    nx, ny = goal[0] + dx, goal[1] + dy
-                    if self.layout.is_free((nx, ny)):
-                        path = self._a_star(start, (nx, ny))
-                        if path:
-                            logger.info("找到临时目标 %s 的替代路径", (nx, ny))
-                            return path
-        logger.error("在扩圈后仍无法找到路径")
-        return None
-
-    # ---- internal ----------------------------------------------------------
-    def _a_star(
-        self, start: Tuple[int, int], goal: Tuple[int, int]
-    ) -> Optional[List[Tuple[int, int]]]:
-        layout = self.layout
-        open_heap: List[Tuple[int, Tuple[int, int]]] = []
-        heapq.heappush(open_heap, (0, start))
-        came_from: Dict[Tuple[int, int], Tuple[int, int]] = {}
-        g_score: Dict[Tuple[int, int], int] = {start: 0}
-
-        while open_heap:
-            _, current = heapq.heappop(open_heap)
-            if current == goal:
-                return self._reconstruct(came_from, current)
-
-            for nb in layout.neighbors(current):
-                tentative = g_score[current] + 1
-                if tentative < g_score.get(nb, float("inf")):
-                    came_from[nb] = current
-                    g_score[nb] = tentative
-                    f_score = tentative + self._heuristic(nb, goal)
-                    heapq.heappush(open_heap, (f_score, nb))
-
-        logger.warning("A* 失败: %s -> %s", start, goal)
-        return None
-
-    @staticmethod
-    def _reconstruct(
-        came_from: Dict[Tuple[int, int], Tuple[int, int]],
-        current: Tuple[int, int],
-    ) -> List[Tuple[int, int]]:
-        path = [current]
-        while current in came_from:
-            current = came_from[current]
-            path.append(current)
-        path.reverse()
-        return path
 
 
 # --------------------------------------------------------------------------- #
@@ -145,12 +41,23 @@ class Order:
         self,
         order_id: int,
         table_id: str,
-        prep_time: int,
+        prep_time: float = 0,
+        ready_time: float = None,
         items: Optional[List[str]] = None,
     ) -> None:
+        """
+        初始化订单
+        
+        Args:
+            order_id: 订单ID
+            table_id: 桌号
+            prep_time: 准备时间（秒）
+            ready_time: 订单准备好的时间点（绝对时间，未来扩展用）
+        """
         self.order_id = order_id
         self.table_id = table_id
         self.prep_time = prep_time
+        self.ready_time = ready_time
         self.items = items or []
 
         self.status = OrderStatus.WAITING
@@ -158,9 +65,14 @@ class Order:
 
         # 时间戳
         self.prep_start_time: Optional[float] = None
-        self.ready_time: Optional[float] = None
         self.delivery_start_time: Optional[float] = None
         self.delivery_end_time: Optional[float] = None
+        self.delivery_complete_time: Optional[float] = None
+        self.delivery_success: Optional[bool] = None
+        self.is_assigned = False
+        self.assigned_robot_id: Optional[int] = None
+        # 配送完成顺序编号（按照实际送达顺序）
+        self.delivery_sequence: Optional[int] = None
 
     # ---- 状态流转 ----------------------------------------------------------
     def start_preparing(self) -> None:
@@ -191,7 +103,11 @@ class Order:
 
     # ---- 统计 --------------------------------------------------------------
     def total_time(self) -> Optional[float]:
-        return (self.delivery_end_time or 0) - self.created_time if self.delivery_end_time else None
+        return (
+            (self.delivery_end_time or 0) - self.created_time
+            if self.delivery_end_time
+            else None
+        )
 
     def delivery_time(self) -> Optional[float]:
         if self.delivery_start_time and self.delivery_end_time:
@@ -226,11 +142,13 @@ class OrderManager:
         self.failed: List[Order] = []
 
     # ---- 创建与状态迁移 -----------------------------------------------------
-    def create(self, table_id: str, prep_time: int, items: Optional[List[str]] = None) -> Order:
+    def create(
+        self, table_id: str, prep_time: int, items: Optional[List[str]] = None
+    ) -> Order:
         """
         新建订单并加入 waiting 队列
         """
-        order = Order(self._next_id, table_id, prep_time, items)
+        order = Order(self._next_id, table_id, prep_time)
         self._next_id += 1
         self._orders[order.order_id] = order
         self.waiting.append(order)
@@ -246,12 +164,17 @@ class OrderManager:
     def tick_kitchen(self) -> None:
         """
         模拟一次厨房时间片推进：准备完成 -> READY
+        
+        注意: 此方法当前未被直接引用，但保留作为未来扩展功能
+        主要用于多机器人场景下的订单准备过程模拟
         """
         now = time.time()
 
         # 检查准备完成
         finished = [
-            od for od in self.preparing if now - (od.prep_start_time or now) >= od.prep_time
+            od
+            for od in self.preparing
+            if now - (od.prep_start_time or now) >= od.prep_time
         ]
         for od in finished:
             od.finish_preparing()
@@ -259,10 +182,7 @@ class OrderManager:
             logger.debug("订单准备完成 %s", od)
 
         # 启动新准备
-        while (
-            self.waiting
-            and len(self.preparing) < self.MAX_SIMULTANEOUS_PREPARING
-        ):
+        while self.waiting and len(self.preparing) < self.MAX_SIMULTANEOUS_PREPARING:
             od = self.waiting.pop(0)
             od.start_preparing()
             self.preparing.append(od)
@@ -272,12 +192,18 @@ class OrderManager:
     def next_ready_order(self) -> Optional[Order]:
         """
         取队首可配送订单，不弹出
+        
+        注意: 此方法当前未被直接引用，但保留作为未来扩展功能
+        主要用于中心化调度场景下获取下一个待配送订单
         """
         return self.ready[0] if self.ready else None
 
     def assign_to_robot(self, order: Order) -> bool:
         """
         将订单指派给机器人
+        
+        注意: 此方法当前未被直接引用，但保留作为未来扩展功能
+        主要用于中心化调度场景下的订单分配
         """
         if order not in self.ready:
             return False
@@ -311,15 +237,21 @@ class OrderManager:
         统计订单相关指标
         """
         total = len(self._orders)
-        delivery_times = [od.delivery_time() for od in self.completed if od.delivery_time()]
+        delivery_times = [
+            od.delivery_time() for od in self.completed if od.delivery_time()
+        ]
         total_times = [od.total_time() for od in self.completed if od.total_time()]
         return {
             "total_orders": total,
             "completed": len(self.completed),
             "failed": len(self.failed),
             "success_rate": len(self.completed) / total * 100 if total else 0.0,
-            "avg_delivery_time": sum(delivery_times) / len(delivery_times) if delivery_times else 0.0,
-            "avg_total_time": sum(total_times) / len(total_times) if total_times else 0.0,
+            "avg_delivery_time": (
+                sum(delivery_times) / len(delivery_times) if delivery_times else 0.0
+            ),
+            "avg_total_time": (
+                sum(total_times) / len(total_times) if total_times else 0.0
+            ),
         }
 
     # ---- misc --------------------------------------------------------------

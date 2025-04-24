@@ -10,7 +10,7 @@ WORKDIR /app
 
 # 拷贝并安装依赖到 /usr/local （PREFIX）
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/usr/local -r requirements.txt
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # ───────────────────────────────────────────────────────────────
 # Stage 2: 运行时镜像
@@ -33,6 +33,6 @@ EXPOSE 8501
 
 # 容器启动时执行
 CMD ["streamlit", "run", "app.py", \
-     "--server.port=8501", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true"]
+    "--server.port=8501", \
+    "--server.address=0.0.0.0", \
+    "--server.headless=true"]
