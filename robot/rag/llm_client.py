@@ -33,7 +33,7 @@ class LLMClient:
         resp = self.client.embeddings.create(model=model, input=texts)
         return np.array([item.embedding for item in resp.data], dtype="float32")
 
-    def chat(self, system: str, user: str, model: str = "gpt-3.5-turbo", **kw) -> str:
+    def chat(self, system: str, user: str, model: str = "gpt-4o", **kw) -> str:
         """
         对话
         """

@@ -75,6 +75,7 @@ class MotionController:
         优先调用 RAG；否则直接重新规划
         """
         if self.rag and self.rag.is_ready():
+            # 调用RAG决策层
             decision = self.rag.make_decision(
                 situation_type="obstacle",
                 position=pos,
@@ -82,10 +83,16 @@ class MotionController:
                 context=obstacle,
             )
             logger.info("RAG 决策: %s", decision)
-            if decision in {"绕行", "重新规划"} and goal:
+            # 英文动作关键字处理
+            if decision == "reroute" and goal:
+                # 重新规划路径
                 return self.planner.find_path(pos, goal) or []
-            if decision == "等待":
+            if decision == "wait":
+                # 等待一段时间后再尝试
                 time.sleep(0.5)
+                return []
+            if decision == "report_unreachable":
+                # 标记为不可达，返回空路径
                 return []
         # 基础策略：重新规划或放弃
         return self.planner.find_path(pos, goal) if goal else []

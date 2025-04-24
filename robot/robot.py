@@ -164,6 +164,18 @@ class Robot:
             self._finish_delivery(success=False)
             return False
 
+        # 如果是智能机器人，触发RAG的规划层并记录建议
+        if self.is_ai_enhanced and getattr(self, 'rag', None):
+            rag_result = self.rag.trigger_layer(
+                'plan',
+                {'robot_id': self.robot_id, 'start': self.position, 'goal': self.goal}
+            )
+            logger.info(
+                f"RAG 规划建议: action={rag_result['action']}, "
+                f"context_docs={rag_result['context_docs']}, "
+                f"raw_response={rag_result['raw_response']}"
+            )
+
         # 开始配送
         order.start_delivery()
         

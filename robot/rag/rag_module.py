@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 from .llm_client import LLMClient
 from .knowledge_base import KnowledgeBase
@@ -35,7 +35,7 @@ class RAGModule:
             self.retriever = Retriever(kb)
         else:
             self.retriever = None
-            logger.warning("No knowledge base provided; RAG fallback to zero‑shot.")
+            logger.warning("No knowledge base provided; RAG fallback to zero-shot.")
 
     # ---------------- 公共 ---------------- #
     def is_ready(self) -> bool:
@@ -86,6 +86,76 @@ class RAGModule:
         # 调用LLM生成回答
         return self.llm.chat(system=system_prompt, user=query)
     
+    def trigger_layer(self, event: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        触发层：在特定事件触发时调用思考层和决策层
+        """
+        if event == 'plan':
+            query = PromptHelper.build_plan_query(
+                robot_id=context.get('robot_id', 0),
+                start=context.get('start'),
+                goal=context.get('goal'),
+            )
+        elif event == 'obstacle':
+            query = PromptHelper.build_obstacle_query(
+                robot_id=context.get("robot_id", 0),
+                position=context.get("position", (0, 0)),
+                goal=context.get("goal", (0, 0)),
+                obstacle=context.get("obstacle", (0, 0)),
+            )
+        else:
+            raise ValueError(f"Unknown event type: {event}")
+
+        raw_response, docs = self.thinking_layer(query, use_rag=True)
+        action = self.decision_layer(raw_response)
+        return {
+            "action": action,
+            "raw_response": raw_response,
+            "context_used": bool(docs),
+            "context_docs": docs,
+        }
+
+    def thinking_layer(self, query: str, use_rag: bool = True) -> Tuple[str, List[str]]:
+        """
+        思考层：检索知识并调用LLM生成回答，返回(raw_response, context)
+        """
+        context = self._get_rag_context(query) if use_rag and self.is_ready() else []
+        system_prompt = "你是一个知识丰富的助手，请依据提供的上下文回答问题。"
+        if context:
+            system_prompt += "\n\n相关参考信息:\n" + "\n\n".join([f"- {doc}" for doc in context])
+        raw_response = self.llm.chat(system=system_prompt, user=query)
+        return raw_response, context
+
+    def decision_layer(self, raw_response: str) -> str:
+        """
+        决策层：将LLM响应结果转化为简化的动作
+        """
+        return PromptHelper.simplify(raw_response)
+
+    def make_decision(self, situation_type: str, **kwargs) -> str:
+        """
+        决策接口：根据事件类型和上下文返回动作
+        """
+        # 根据事件类型映射上下文
+        context: Dict[str, Any]
+        if situation_type == 'obstacle':
+            context = {
+                'robot_id': kwargs.get('robot_id', 0),
+                'position': kwargs.get('position'),
+                'goal': kwargs.get('goal'),
+                'obstacle': kwargs.get('context'),
+            }
+        elif situation_type == 'plan':
+            context = {
+                'robot_id': kwargs.get('robot_id', 0),
+                'start': kwargs.get('start'),
+                'goal': kwargs.get('goal'),
+            }
+        else:
+            context = kwargs  # 其他事件直接使用原始kwargs
+        result = self.trigger_layer(situation_type, context)
+        return result.get('action', '')
+
     # ---------------- 私有 ---------------- #
     def _get_rag_context(self, query: str) -> List[str]:
         """
