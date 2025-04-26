@@ -41,6 +41,20 @@ robot/rag/
 
 可在项目根目录创建 `.env` 文件配置。
 
+---
+
+## 快速测试
+
+- 安装Docker并启动:
+
+```bash
+docker compose up --build
+```
+
+- 访问：[http://localhost:8501]
+
+- 在应用中进行测试
+
 ## 改进建议
 
 - 目前还只是测试版RAG，尚未真正集成检索。

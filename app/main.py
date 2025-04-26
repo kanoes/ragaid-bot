@@ -16,6 +16,7 @@ from .ui import (
     render_plotly_stats,
     render_plotly_robot_path,
     render_plotly_stats_extended,
+    render_rag_test,
 )
 from .handlers import (
     handle_layout_selection,
@@ -99,7 +100,7 @@ def run():
     sim_button = st.sidebar.button("开始模拟", key="sim_button")
 
     # --- 主界面标签页 ---
-    tab1, tab2, tab3 = st.tabs(["模拟器", "数据分析", "布局编辑器"])
+    tab1, tab2, tab3, tab4 = st.tabs(["模拟器", "数据分析", "布局编辑器", "RAG测试"])
 
     with tab1:
         # 可视化当前布局
@@ -284,3 +285,7 @@ def run():
                     st.success(f"已保存布局: {layout_name}")
                     # 自动将新布局设为当前餐厅
                     set_restaurant(saved_restaurant)
+
+    # 添加RAG测试标签页
+    with tab4:
+        render_rag_test()

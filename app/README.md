@@ -11,7 +11,7 @@ app/
 ├─ main.py          # 应用入口与页面渲染
 ├─ simulation.py    # 模拟引擎核心逻辑
 ├─ state.py         # 会话状态管理封装
-├─ ui.py            # 可复用 UI 组件
+├─ ui.py            # APP界面
 └─ utils.py         # 辅助工具函数
 ```
 

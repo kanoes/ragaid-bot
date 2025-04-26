@@ -73,7 +73,7 @@ ragaid-bot/
 - 安装Docker并启动:
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 - 访问：[http://localhost:8501]
