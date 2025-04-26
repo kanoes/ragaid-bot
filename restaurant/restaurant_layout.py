@@ -108,73 +108,6 @@ class RestaurantLayout:
             如果桌子不存在或没有送餐点，返回None
         """
         return self.delivery_points.get(table_id)
-
-    @staticmethod
-    def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
-        """
-        从字符串数组解析餐厅布局
-
-        Args:
-            layout_name: 布局名称
-            layout_lines: 布局字符串数组
-
-        Returns:
-            dict: 包含解析后的布局配置
-        """
-        # 字符到数值的映射
-        char_map = {
-            "#": 1,
-            "＃": 1,
-            "W": 1,  # 墙壁/障碍
-            "*": 0,
-            ".": 0,  # 空地
-            "台": 100,  # 厨房 (新格式)
-            "厨": 100,  # 厨房 (新格式)
-            "停": 200,  # 停靠点 (新格式)
-            "P": 200,  # 停靠点 (新格式)
-        }
-
-        # 初始化数据结构
-        height = len(layout_lines)
-        width = max(len(line.split()) for line in layout_lines) if height else 0
-        grid = [[0] * width for _ in range(height)]
-        table_positions = {}
-        kitchen_positions = []
-        parking_position = None
-
-        # 解析布局字符串
-        for row, line in enumerate(layout_lines):
-            tokens = line.split()
-            for col, token in enumerate(tokens):
-                if token in char_map:
-                    # 已知符号
-                    value = char_map[token]
-                    grid[row][col] = value
-
-                    # 特殊位置记录
-                    if value == 100:  # 厨房
-                        kitchen_positions.append((row, col))
-                    elif value == 200:  # 停靠点
-                        parking_position = (row, col)
-                elif token.isalpha() and len(token) == 1:
-                    # 桌子
-                    grid[row][col] = 2
-                    table_positions[token] = (row, col)
-                elif token.isdigit() and 2 <= int(token) <= 99:
-                    # 桌子编号 (新格式)
-                    table_num = int(token)
-                    grid[row][col] = table_num
-                    table_positions[str(table_num)] = (row, col)
-                else:
-                    # 未知符号，当作空地处理
-                    grid[row][col] = 0
-
-        return {
-            "grid": grid,
-            "table_positions": table_positions,
-            "kitchen_positions": kitchen_positions,
-            "parking_position": parking_position,
-        }
     
     @staticmethod
     def parse_layout_from_array(layout_name: str, grid_array: List[List[int]]):
@@ -207,16 +140,17 @@ class RestaurantLayout:
         for row in range(height):
             for col in range(width):
                 value = grid[row][col]
-                if 2 <= value <= 99:  # 桌子
+                if value == 101:  # 墙壁/障碍物
+                    grid[row][col] = 1
+                elif 1 <= value <= 99:  # 桌子
                     table_positions[str(value)] = (row, col)
-                    # 保持值为2以兼容原有逻辑
                     grid[row][col] = 2
                 elif value == 100:  # 厨房
                     kitchen_positions.append((row, col))
-                    grid[row][col] = 3  # 兼容原有代码
+                    grid[row][col] = 3
                 elif value == 200:  # 停靠点
                     parking_position = (row, col)
-                    grid[row][col] = 4  # 兼容原有代码
+                    grid[row][col] = 4
         
         return {
             "grid": grid,

@@ -145,33 +145,20 @@ def load_restaurant(layout_name, layout_dir=LAYOUT_DIR):
     """
     加载餐厅布局
     """
-    # 首先检查新格式文件
     new_format_path = os.path.join(layout_dir, "layouts.json")
-    if os.path.exists(new_format_path):
-        try:
-            with open(new_format_path, encoding="utf-8") as f:
-                layouts_data = json.load(f)
-                for layout in layouts_data["layouts"]:
-                    if layout["name"] == layout_name:
-                        # 使用新格式解析器
-                        cfg = RestaurantLayout.parse_layout_from_array(
-                            layout_name, layout["grid"]
-                        )
-                        return Restaurant(layout["name"], RestaurantLayout(**cfg))
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"从新格式文件加载布局失败: {e}")
-    
-    # 回退到旧格式
-    json_path = os.path.join(layout_dir, f"{layout_name}.json")
-    if not os.path.exists(json_path):
-        raise FileNotFoundError(f"找不到布局文件: {json_path}")
-        
-    with open(json_path, encoding="utf-8") as fp:
-        data = json.load(fp)
-    
-    # 使用RestaurantLayout类的静态方法解析布局
-    cfg = RestaurantLayout.parse_layout_from_strings(layout_name, data["layout"])
-    return Restaurant(data.get("name", layout_name), RestaurantLayout(**cfg))
+    if not os.path.exists(new_format_path):
+        raise FileNotFoundError(f"找不到布局文件: {new_format_path}")
+
+    with open(new_format_path, encoding="utf-8") as f:
+        layouts_data = json.load(f)
+    for layout in layouts_data["layouts"]:
+        if layout["name"] == layout_name:
+            cfg = RestaurantLayout.parse_layout_from_array(
+                layout_name, layout["grid"]
+            )
+            return Restaurant(layout_name, RestaurantLayout(**cfg))
+
+    raise KeyError(f"在 layouts.json 中未找到名为 {layout_name} 的布局")
 
 def save_restaurant_layout(layout_data, layout_dir=LAYOUT_DIR):
     """
