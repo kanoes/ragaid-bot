@@ -1,5 +1,5 @@
 """
-UI事件处理函数
+UIイベント処理関数
 """
 
 import streamlit as st
@@ -13,26 +13,26 @@ from .state import append_batch_histories
 
 def handle_layout_selection(layout_name):
     """
-    处理布局选择事件
+    レイアウト選択イベントを処理
     """
     return load_restaurant(layout_name)
 
 
 def handle_layout_save(layout_data):
     """
-    处理布局保存事件
+    レイアウト保存イベントを処理
     
     Args:
-        layout_data: dict, 布局数据
+        layout_data: dict, レイアウトデータ
 
     Returns:
-        Restaurant: 创建的餐厅对象
+        Restaurant: 作成されたレストランオブジェクト
     """
     if layout_data:
-        # 保存到文件
+        # ファイルに保存
         save_restaurant_layout(layout_data)
 
-        # 创建一个新的RestaurantLayout实例
+        # 新しいRestaurantLayoutインスタンスを作成
         layout = RestaurantLayout(
             grid=layout_data.get("grid"),
             table_positions=layout_data.get("table_positions"),
@@ -40,37 +40,37 @@ def handle_layout_save(layout_data):
             parking_position=layout_data.get("parking_position"),
         )
 
-        # 创建并返回Restaurant对象
-        return Restaurant(layout_data.get("name", "新布局"), layout)
+        # Restaurantオブジェクトを作成して返す
+        return Restaurant(layout_data.get("name", "新レイアウト"), layout)
 
     return None
 
 
 def handle_layout_delete(layout_name):
     """
-    处理布局删除事件
+    レイアウト削除イベントを処理
 
     Args:
-        layout_name: str, 要删除的布局名称
+        layout_name: str, 削除するレイアウト名
 
     Returns:
-        bool: 是否成功删除
+        bool: 削除に成功したかどうか
     """
     return delete_restaurant_layout(layout_name)
 
 
 def handle_simulation(restaurant, use_ai, num_orders):
     """
-    处理模拟按钮点击事件
+    シミュレーションボタンクリックイベントを処理
     """
-    with st.spinner(f"正在模拟 {num_orders} 个订单的配送过程..."):
-        # 创建模拟引擎
+    with st.spinner(f"{num_orders}件の注文の配達プロセスをシミュレーション中..."):
+        # シミュレーションエンジンを作成
         engine = SimulationEngine(restaurant, use_ai)
-        # 运行模拟
+        # シミュレーションを実行
         stats, path_histories = engine.run(num_orders)
         
-        # 如果有新的配送历史记录，添加到累积历史数据中
-        if "配送历史" in stats and stats["配送历史"]:
-            append_batch_histories(stats["配送历史"])
+        # 新しい配達履歴がある場合、累積履歴データに追加
+        if "配達履歴" in stats and stats["配達履歴"]:
+            append_batch_histories(stats["配達履歴"])
             
         return stats, path_histories

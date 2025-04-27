@@ -1,12 +1,12 @@
 """
-机器人主体（调度层）
+ロボット本体（スケジューリング層）
 
-分层架构
+階層構造
 --------
-* PathPlanner             — 规划层（robot.path_planner）
-* Order / OrderManager    — 订单层（robot.order）
-* MotionController        — 动作层（robot.motion_controller）
-* Robot / AIEnhancedRobot — 调度层（本文件）
+* PathPlanner             — 計画層（robot.path_planner）
+* Order / OrderManager    — 注文層（robot.order）
+* MotionController        — アクション層（robot.motion_controller）
+* Robot / AIEnhancedRobot — スケジューリング層（本ファイル）
 """
 
 from __future__ import annotations
@@ -31,25 +31,25 @@ logger = logging.getLogger(__name__)
 
 class Robot:
     """
-    基础机器人：无 RAG 智能
+    基本ロボット：RAG知能なし
     """
 
-    # 定义到达目标点的容忍半径
-    GOAL_TOLERANCE = 0  # 目标点容忍半径（格子数）
+    # 目標点到達の許容半径を定義
+    GOAL_TOLERANCE = 0  # 目標点許容半径（マス数）
 
     def __init__(
         self,
         layout: RestaurantLayout,
         robot_id: int = 1,
-        restaurant_name: str = "默认餐厅",
+        restaurant_name: str = "デフォルトレストラン",
         start: Optional[Tuple[int, int]] = None,
     ) -> None:
         self.layout = layout
         self.robot_id = robot_id
-        self.speed = 1.0  # 机器人速度，单位：格子/时间单位
+        self.speed = 1.0  # ロボット速度、単位：マス/時間単位
         self.restaurant_name = restaurant_name
 
-        # 确保机器人从停靠点出发
+        # ロボットが駐車スポットから出発することを確保
         self.parking_spot = layout.parking or (layout.kitchen[0] if layout.kitchen else (0, 0))
         self.position = self.parking_spot
         self.goal: Optional[Tuple[int, int]] = None
@@ -58,146 +58,147 @@ class Robot:
         self.planner = PathPlanner(layout)
         self.controller = MotionController(layout, self.planner)
 
-        # 订单队列
+        # 注文キュー
         self.order_queue: Deque[Order] = deque()
         self.current_order: Optional[Order] = None
         
-        # 新的统计数据结构
+        # 新しい統計データ構造
         self._stats = {
-            "total_steps": 0,            # 总步数（路径长度）
-            "total_time": 0,             # 总配送时间
-            "total_orders": 0,           # 总订单数
-            "avg_waiting_time": 0,       # 平均订单等待时间
+            "total_steps": 0,            # 総ステップ数（経路長）
+            "total_time": 0,             # 総配達時間
+            "total_orders": 0,           # 総注文数
+            "avg_waiting_time": 0,       # 平均注文待ち時間
         }
-        # 历史配送记录
+        # 配達履歴
         self._delivery_history = []
         
         self.path_history: list[tuple[int, int]] = [self.position]
         self.returning_to_parking = False
         self.delivery_start_time = None
         self.all_assigned_orders = []
-        self.is_ai_enhanced = isinstance(self, AIEnhancedRobot)  # 检查是否为智能机器人
+        self.is_ai_enhanced = isinstance(self, AIEnhancedRobot)  # インテリジェントロボットかどうかを確認
         
-        # 批处理控制参数
-        self.batch_collection_time = 1.0  # 批量收集订单的时间窗口（秒）
-        self.last_order_time = None      # 最后一次收到订单的时间
-        self.batch_processing = False    # 是否正在批处理模式
+        # バッチ処理制御パラメータ
+        self.batch_collection_time = 1.0  # 注文を一括収集する時間ウィンドウ（秒）
+        self.last_order_time = None      # 最後に注文を受けた時間
+        self.batch_processing = False    # バッチ処理モードかどうか
         
-        # 当前批次信息
-        self.current_batch_start_time = None  # 当前批次开始时间
-        self.current_batch_orders = []        # 当前批次订单
-        self.current_batch_id = 0             # 当前批次ID
+        # 現在のバッチ情報
+        self.current_batch_start_time = None  # 現在のバッチ開始時間
+        self.current_batch_orders = []        # 現在のバッチ注文
+        self.current_batch_id = 0             # 現在のバッチID
 
-    # ---------------- 订单接口 ---------------- #
+    # ---------------- 注文インターフェース ---------------- #
     def assign_order(self, order: Order) -> bool:
         """
-        接单并加入队列
+        注文を受け付けてキューに追加
         """
         table_pos = self.layout.tables.get(order.table_id)
         if not table_pos:
-            logger.error("桌号不存在 %s", order.table_id)
+            logger.error("テーブル番号が存在しません %s", order.table_id)
             return False
 
-        # 将订单加入队列
+        # 注文をキューに追加
         self.order_queue.append(order)
         self.all_assigned_orders.append(order)
-        logger.info("Robot #%s 接收订单 #%s 加入队列", self.robot_id, order.order_id)
+        logger.info("ロボット #%s が注文 #%s をキューに追加", self.robot_id, order.order_id)
         
-        # 记录最后收到订单的时间
+        # 最後に注文を受けた時間を記録
         self.last_order_time = time.time()
         
-        # 如果机器人空闲且未在批处理中，启动批处理定时器
+        # ロボットがアイドル状態でバッチ処理中でない場合、バッチ処理タイマーを開始
         if not self.current_order and not self.returning_to_parking and not self.batch_processing:
             self.batch_processing = True
-            logger.info("Robot #%s 开始订单批处理，等待更多订单...", self.robot_id)
+            logger.info("ロボット #%s が注文バッチ処理を開始、追加の注文を待機中...", self.robot_id)
             
         return True
 
     def _process_next_order(self) -> bool:
         """
-        处理队列中的下一个订单
+        キュー内の次の注文を処理
         """
         if not self.order_queue:
-            # 如果没有更多订单且不在停靠点，则返回停靠点
+            # 注文がなく駐車スポットにいない場合、駐車スポットに戻る
             if self.position != self.parking_spot and not self.returning_to_parking:
                 self._return_to_parking()
             return False
 
-        # 优化订单队列
+        # 注文キューを最適化
         self._optimize_order_queue()
         
-        # 记录当前批次开始
+        # 現在のバッチ開始を記録
         if not self.current_batch_start_time:
             self.current_batch_start_time = time.time()
             self.current_batch_id += 1
             self.current_batch_orders = []
 
-        # 取出下一个订单
+        # 次の注文を取り出す
         order = self.order_queue.popleft()
         self.current_order = order
         
-        # 添加到当前批次
+        # 現在のバッチに追加
         self.current_batch_orders.append(order)
         
-        # 计算订单等待时间 (从创建到开始配送)
+        # 注文待ち時間の計算（作成から配達開始まで）
         waiting_time = time.time() - order.created_time
         
-        # 获取桌子对应的送餐点
+        # テーブルに対応する配達ポイントを取得
         delivery_pos = self.layout.get_delivery_point(order.table_id)
         if not delivery_pos:
-            logger.error("桌号 %s 没有指定送餐点", order.table_id)
+            logger.error("テーブル番号 %s に指定された配達ポイントがありません", order.table_id)
             self._finish_delivery(success=False)
             return False
 
         if not self.layout.is_free(delivery_pos):
-            logger.error("桌号 %s 的送餐点 %s 不可通行", order.table_id, delivery_pos)
+            logger.error("テーブル番号 %s の配達ポイント %s は通行できません", order.table_id, delivery_pos)
             self._finish_delivery(success=False)
             return False
 
-        # 设置目标点
+        # 目標点を設定
         self.goal = delivery_pos
         
-        # 规划路径
+        # 経路計画
         self.path = self.planner.find_path(self.position, self.goal) or []
         if not self.path:
-            logger.error("无法规划到达桌子 %s 的路径", order.table_id)
+            logger.error("テーブル %s への経路を計画できません", order.table_id)
             self._finish_delivery(success=False)
             return False
 
-        # 如果是智能机器人，触发RAG的规划层并记录建议
+        # インテリジェントロボットの場合、RAGの計画層をトリガーして提案を記録
         if self.is_ai_enhanced and getattr(self, 'rag', None):
             rag_result = self.rag.trigger_layer(
                 'plan',
                 {'robot_id': self.robot_id, 'start': self.position, 'goal': self.goal}
             )
             logger.info(
-                f"RAG 规划建议: action={rag_result['action']}, "
+                f"RAG 計画提案: action={rag_result['action']}, "
                 f"context_docs={rag_result['context_docs']}, "
                 f"raw_response={rag_result['raw_response']}"
             )
 
-        # 开始配送
+        # 配達開始
         order.start_delivery()
         
-        # 如果是第一次从停靠点出发，记录开始时间
+        # 初めて駐車スポットから出発する場合、開始時間を記録
         if self.position == self.parking_spot and self.delivery_start_time is None:
             self.delivery_start_time = time.time()
         
-        logger.info("机器人 #%s 开始送餐至桌号 %s，目标位置 %s",
+        logger.info("ロボット #%s がテーブル番号 %s への配達を開始、目標位置 %s",
                    self.robot_id, order.table_id, self.goal)
         
         return True
 
     def _optimize_order_queue(self) -> None:
         """
-        优化订单队列的配送顺序
-        使用近似TSP（旅行商问题）算法，考虑整体路径长度而非简单距离
-        目标：最小化总配送时间和路径长度
+        注文キューの配達順序を最適化
+        近似TSP（巡回セールスマン問題）アルゴリズムを使用し、単純な距離ではなく
+        全体の経路長を考慮します。
+        目標：総配達時間と経路長を最小化
         """
         if len(self.order_queue) <= 1:
-            return  # 没有订单或只有一个订单，不需要优化
+            return  # 注文がないか1つしかない場合、最適化不要
         
-        # 获取当前位置和所有订单的送餐点
+        # 現在位置とすべての注文の配達ポイントを取得
         current_pos = self.position
         delivery_points = {}
         
@@ -207,119 +208,119 @@ class Robot:
                 delivery_points[order.order_id] = delivery_pos
         
         if not delivery_points:
-            return  # 没有有效的送餐点
+            return  # 有効な配達ポイントがない
             
-        # 构建距离矩阵（包括从当前位置到各个送餐点，以及送餐点之间的距离）
+        # 距離行列を構築（現在位置から各配達ポイント、および配達ポイント間の距離を含む）
         points = [current_pos] + list(delivery_points.values())
         n = len(points)
         
-        # 计算路径长度函数，使用A*算法获取实际路径长度而非简单曼哈顿距离
+        # 経路長計算関数、単純なマンハッタン距離ではなくA*アルゴリズムで実際の経路長を取得
         def get_path_length(start, end):
             path = self.planner.find_path(start, end)
             return len(path) if path else float('inf')
         
-        # 构建距离矩阵
+        # 距離行列の構築
         distances = [[0 for _ in range(n)] for _ in range(n)]
         for i in range(n):
             for j in range(n):
                 if i != j:
                     distances[i][j] = get_path_length(points[i], points[j])
         
-        # 贪婪算法实现TSP近似解：每次选择最近的未访问点
-        # 注意：从当前位置(索引0)开始
-        current = 0  # 从当前位置开始
-        unvisited = set(range(1, n))  # 索引1开始的送餐点
+        # 貪欲法によるTSP近似解：毎回最も近い未訪問点を選択
+        # 注意：現在位置（インデックス0）から開始
+        current = 0  # 現在位置から開始
+        unvisited = set(range(1, n))  # インデックス1以降の配達ポイント
         tour = [current]
         
-        # 贪婪构建路径
+        # 貪欲に経路を構築
         while unvisited:
             nearest = min(unvisited, key=lambda j: distances[current][j])
             tour.append(nearest)
             unvisited.remove(nearest)
             current = nearest
             
-        # 重新构建订单队列
+        # 注文キューの再構築
         new_queue = []
         
-        # 将路径转化为订单 (跳过索引0，那是机器人当前位置)
+        # 経路を注文に変換（インデックス0はスキップ、それはロボットの現在位置）
         for idx in tour[1:]:
             point = points[idx]
-            # 找到对应此送餐点的订单
+            # この配達ポイントに対応する注文を探す
             for order in self.order_queue:
                 if delivery_points.get(order.order_id) == point:
                     new_queue.append(order)
                     break
         
-        # 更新订单队列
+        # 注文キューを更新
         self.order_queue.clear()
         for order in new_queue:
             self.order_queue.append(order)
             
-        # 计算估计的总配送路程
+        # 推定の総配達路程を計算
         total_distance = sum(distances[tour[i]][tour[i+1]] for i in range(len(tour)-1))
         
-        logger.info("Robot #%s 优化了订单队列，执行顺序: %s（估计总长度: %d）", 
+        logger.info("Robot #%s 注文キューを最適化、実行順序: %s（推定総長: %d）", 
                    self.robot_id, 
                    ", ".join([f"#{order.order_id}({order.table_id})" for order in new_queue]),
                    total_distance)
 
     def _return_to_parking(self) -> bool:
         """
-        返回停靠点
+        駐車スポットに戻る
         """
         self.returning_to_parking = True
         self.goal = self.parking_spot
         self.path = self.planner.find_path(self.position, self.goal) or []
         
         if not self.path:
-            logger.error("无法规划返回停靠点的路径")
+            logger.error("駐車スポットに戻る経路を計画できません")
             self.returning_to_parking = False
             return False
             
-        logger.info("Robot #%s 正在返回停靠点", self.robot_id)
+        logger.info("Robot #%s が駐車スポットに戻る途中です", self.robot_id)
         return True
         
     def _is_at_goal(self) -> bool:
         """
-        判断机器人是否已经到达目标点（考虑容忍范围）
+        ロボットが目標点に到達したかどうかを判断（許容範囲を考慮）
         """
         if not self.goal:
             return False
             
-        # 计算当前位置到目标点的曼哈顿距离
+        # 現在位置から目標点までのマンハッタン距離を計算
         dist = abs(self.position[0] - self.goal[0]) + abs(self.position[1] - self.goal[1])
         
-        # 如果距离在容忍范围内，则认为到达目标
+        # 距離が許容範囲内にある場合、目標に到達したと見なす
         return dist <= self.GOAL_TOLERANCE
 
-    # ---------------- 模拟循环 ---------------- #
+    # ---------------- シミュレーションループ ---------------- #
     def tick(self) -> None:
-        # 记录步数
+        # ステップ数を記録
         self._stats["total_steps"] += 1
         
-        # 检查批处理定时
+        # バッチ処理タイマーをチェック
         if self.batch_processing and self.last_order_time:
             if time.time() - self.last_order_time >= self.batch_collection_time:
-                # 批处理时间窗口结束，开始处理订单
-                logger.info("Robot #%s 批处理时间窗口结束，开始优化订单队列", self.robot_id)
+                # バッチ処理時間ウィンドウが終了、注文を処理
+                logger.info("Robot #%s バッチ処理時間ウィンドウが終了、注文キューを最適化", self.robot_id)
                 self.batch_processing = False
                 self._process_next_order()
                 
-        if not self.path:  # 没有剩余路径，处理下一步
+        if not self.path:  # 残り経路がない場合、次のステップを処理
             if self.returning_to_parking:
-                # 已到达停靠点，重置状态
+                # 駐車スポットに到着、状態をリセット
                 if self._is_at_goal() or self.position == self.parking_spot:
                     self.returning_to_parking = False
                     self._calculate_delivery_cycle_time()
             elif self.current_order:
-                # 已到达目标位置，完成当前订单
+                # 目標位置に到着、現在の注文を完了
                 if self._is_at_goal() or self.position == self.goal:
-                    # 模拟送餐动作
-                    logger.info("机器人 #%s 已到达目标位置，完成送餐", self.robot_id)
+                    # シミュレーションの配達動作
+                    logger.info("ロボット #%s が目標位置に到着、配達完了", self.robot_id)
                     self._finish_delivery(success=True)
                     self._process_next_order()
             elif not self.batch_processing:
-                # 没有当前订单且不在批处理中，尝试处理下一个
+                # 現在注文がなくバッチ処理中でない場合、次を処理
                 self._process_next_order()
             return
 
@@ -328,74 +329,74 @@ class Robot:
             self.position, self.path, self.goal
         )
 
-        # 只有在实际移动时才记录轨迹
+        # 実際に移動したときに軌跡を記録
         if self.position != prev:
             self.path_history.append(self.position)
             
-        # 检查是否已经到达目标点（考虑容忍范围）
+        # 目標点に到着したかどうかをチェック（許容範囲を考慮）
         if self.goal and self._is_at_goal():
-            # 到达目标，清空剩余路径
+            # 目標に到着、残り経路をクリア
             self.path = []
 
     def _finish_delivery(self, *, success: bool) -> None:
         if not self.current_order:
             return
         if success:
-            # 添加配送完成序号
+            # 配送完了番号を追加
             self.current_order.delivery_sequence = self._stats["total_orders"] + 1
             self.current_order.complete_delivery()
             self._stats["total_orders"] += 1
-            logger.info("订单 #%s (桌号: %s) 送达成功，配送顺序: #%d", 
+            logger.info("注文 #%s (テーブル: %s) 配送成功、配送順序: #%d", 
                        self.current_order.order_id, 
                        self.current_order.table_id,
                        self.current_order.delivery_sequence)
         else:
             self.current_order.fail_delivery()
-            logger.error("订单 #%s 送达失败", self.current_order.order_id)
+            logger.error("注文 #%s 配送失敗", self.current_order.order_id)
         self.current_order = None
         self.goal = None
         self.path = []
 
     def _calculate_delivery_cycle_time(self) -> None:
         """
-        计算从停靠点出发到返回停靠点的总配送时间和统计数据
+        駐車スポットから戻るまでの総配達時間と統計データを計算
         """
         if self.delivery_start_time is not None:
             end_time = time.time()
             
-            # 计算本次批次的时间
+            # 本バッチの時間を計算
             batch_time = 0
             if self.current_batch_start_time is not None:
                 batch_time = end_time - self.current_batch_start_time
             else:
-                # 如果没有批次开始时间，则使用配送开始时间
+                # バッチ開始時間がない場合、配送開始時間を使用
                 batch_time = end_time - self.delivery_start_time
-                self.current_batch_start_time = self.delivery_start_time  # 确保有批次开始时间
+                self.current_batch_start_time = self.delivery_start_time  # バッチ開始時間があることを確保
             
-            # 计算总配送路程
-            path_length = len(self.path_history) - 1  # 减去初始位置
+            # 総配達路程を計算
+            path_length = len(self.path_history) - 1  # 初期位置を除く
             
-            # 根据路径长度和速度计算时间
+            # 経路長と速度を使用して時間を計算
             calculated_time = path_length / self.speed
             
-            # 更新统计数据
+            # 統計データを更新
             self._stats["total_steps"] += path_length
-            self._stats["total_time"] = calculated_time  # 使用计算的时间
+            self._stats["total_time"] = calculated_time  # 計算時間を使用
             
-            # 计算本批次平均订单等待时间
+            # 本バッチの平均注文待ち時間を計算
             avg_batch_waiting_time = 0
             if self.current_batch_orders:
                 total_waiting_time = 0
                 for i, order in enumerate(self.current_batch_orders):
-                    # 订单等待时间 = 订单送达时间 = 从开始到当前订单的配送时间
-                    # 按照配送顺序计算，前面的订单等待时间短，后面的等待时间长
+                    # 注文待ち時間 = 注文到着時間 = 開始から現在注文の配送時間
+                    # 配送順序に従って計算、前の注文待ち時間が短く、後の待ち時間が長い
                     order_delivery_time = calculated_time * (i+1) / len(self.current_batch_orders)
                     total_waiting_time += order_delivery_time
                 
-                # 平均订单等待时间 = 总等待时间 / 订单数量
+                # 平均注文待ち時間 = 総待ち時間 / 注文数
                 avg_batch_waiting_time = total_waiting_time / len(self.current_batch_orders)
                 
-                # 更新总体平均订单等待时间（使用累积移动平均值）
+                # 総体平均注文待ち時間を更新（累積移動平均を使用）
                 if self._stats["total_orders"] > 0:
                     prev_weight = self._stats["total_orders"] - len(self.current_batch_orders)
                     new_weight = len(self.current_batch_orders)
@@ -406,65 +407,65 @@ class Robot:
                 else:
                     self._stats["avg_waiting_time"] = avg_batch_waiting_time
 
-            # 准备订单信息，包含配送顺序
+            # 注文情報を準備、配送順序を含む
             order_info = []
             for order in self.current_batch_orders:
                 order_data = {
                     "order_id": order.order_id,
                     "table_id": order.table_id
                 }
-                # 添加配送顺序信息（如果有）
+                # 配送順序情報を追加（ある場合）
                 if hasattr(order, "delivery_sequence") and order.delivery_sequence is not None:
                     order_data["delivery_sequence"] = order.delivery_sequence
                 order_info.append(order_data)
             
-            # 记录本次配送批次的历史
+            # 本配送バッチの履歴を記録
             batch_record = {
                 "batch_id": self.current_batch_id,
-                "total_time": calculated_time,  # 使用计算的时间
+                "total_time": calculated_time,  # 計算時間を使用
                 "path_length": path_length,
                 "avg_waiting_time": avg_batch_waiting_time,
-                "机器人类型": "智能RAG机器人" if self.is_ai_enhanced else "基础机器人",
+                "ロボットタイプ": "インテリジェントRAGロボット" if self.is_ai_enhanced else "基本ロボット",
                 "orders": order_info,
-                "餐厅布局": self.restaurant_name
+                "レストランレイアウト": self.restaurant_name
             }
             self._delivery_history.append(batch_record)
             
-            logger.info(f"Robot #{self.robot_id} 完成配送周期，总配送时间: {batch_time:.2f}秒，" 
-                       f"送达订单: {len(self.current_batch_orders)}个，"
-                       f"路径长度: {path_length}")
+            logger.info(f"Robot #{self.robot_id} 配送サイクル完了、総配送時間: {batch_time:.2f}秒、" 
+                       f"配送注文: {len(self.current_batch_orders)}個、"
+                       f"経路長: {path_length}")
             
-            # 重置当前批次数据
+            # 現在のバッチデータをリセット
             self.delivery_start_time = None
             self.current_batch_start_time = None
             self.current_batch_orders = []
 
-    # ---------------- 其他 ---------------- #
+    # ---------------- 他の ---------------- #
     def simulate(self, max_step: int = 500) -> None:
         step = 0
-        # 记录配送开始时间（如果尚未设置）
+        # 配送開始時間（まだ設定されていない場合）を記録
         if self.delivery_start_time is None:
             self.delivery_start_time = time.time()
             
-        # 如果处于批处理模式，先等待批处理窗口关闭
+        # バッチ処理モードの場合、先にバッチ処理ウィンドウを閉じるのを待つ
         if self.batch_processing:
             self.batch_processing = False
             if self.order_queue:
-                logger.info("模拟开始：立即结束批处理窗口，开始送餐")
+                logger.info("シミュレーション開始：即時にバッチ処理ウィンドウを終了、配達を開始")
                 self._process_next_order()
         
         while (self.path or self.current_order or self.order_queue or self.returning_to_parking) and step < max_step:
             self.tick()
             step += 1
         
-        # 如果还没有返回停靠点，则返回
+        # バッチ処理モードが終了しても駐車スポットに戻れない場合、駐車スポットに戻る
         if self.position != self.parking_spot and not self.returning_to_parking:
             self._return_to_parking()
             while self.path and step < max_step:
                 self.tick()
                 step += 1
         
-        # 如果模拟结束时没有到达停靠点，确保记录配送周期
+        # シミュレーション終了時に駐車スポットに戻れない場合、配送サイクルを記録
         if not self.returning_to_parking and self.delivery_start_time is not None:
             self._calculate_delivery_cycle_time()
                 
@@ -472,26 +473,26 @@ class Robot:
 
     def stats(self) -> dict:
         """
-        提供丰富的统计指标
+        豊富な統計指標を提供
         """
         stats = dict(self._stats)
             
-        # 添加路径信息
-        stats["总配送路程"] = len(self.path_history) - 1  # 减去初始位置
+        # 経路情報を追加
+        stats["総配送路程"] = len(self.path_history) - 1  # 初期位置を除く
         
-        # 添加机器人类型信息
-        stats["机器人类型"] = "智能RAG机器人" if self.is_ai_enhanced else "基础机器人"
+        # ロボットタイプ情報を追加
+        stats["ロボットタイプ"] = "インテリジェントRAGロボット" if self.is_ai_enhanced else "基本ロボット"
         
-        # 添加历史配送记录
-        stats["配送历史"] = self._delivery_history
+        # 配送履歴を追加
+        stats["配送履歴"] = self._delivery_history
         
-        # 为未来扩展预留其他数据字段
-        stats["其他数据"] = {
-            "能源消耗": 0,       # 预留：机器人能源消耗
-            "障碍物处理次数": 0,   # 预留：遇到障碍物的次数
-            "等待操作次数": 0,     # 预留：等待操作的次数
-            "路径重规划次数": 0,   # 预留：路径重新规划的次数
-            "拥堵区域": [],       # 预留：餐厅拥堵区域
+        # 将来の拡張用に他のデータフィールドを予約
+        stats["他のデータ"] = {
+            "エネルギー消費": 0,       # 予約：ロボットエネルギー消費
+            "障害物処理回数": 0,   # 予約：障害物に遭遇する回数
+            "待機操作回数": 0,     # 予約：待機操作の回数
+            "経路再計画回数": 0,   # 予約：経路を再計画する回数
+            "混雑区域": [],       # 予約：レストラン混雑区域
         }
             
         return stats
@@ -499,7 +500,7 @@ class Robot:
 
 class AIEnhancedRobot(Robot):
     """
-    带 RAG 智能的机器人
+    インテリジェントロボット
     """
 
     def __init__(

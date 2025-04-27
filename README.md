@@ -1,86 +1,86 @@
 # ragaid-bot
 
-该项目旨在建立一个基于Python的2D配送机器人模拟框架，用于比较传统规则机器人与RAG（Retrieval-Augmented Generation）增强机器人的路径效率、成功率和决策等各种表现。
+このプロジェクトは、Pythonベースの2D配送ロボットシミュレーションフレームワークを構築し、従来の規則ベースロボットとRAG（Retrieval-Augmented Generation）強化ロボットの経路効率、成功率、意思決定などのさまざまなパフォーマンスを比較することを目的としています。
 
 ---
 
-## 一、实验内容
+## 一、実験内容
 
-1. **基础实验(正常的机器人如何寻路)**
-   - 机器人接受订单
-   - 机器人规划路线
-   - 机器人行动
-   - 餐厅的创建
-2. **RAG（Retrieval-Augmented Generation）构建**：
-   - 知识库的创建（向量库）
-   - 检索器
-   - llm请求
-3. **RAG（Retrieval-Augmented Generation）机器人构建**：
-   - 将RAG接入正常机器人
+1. **基本実験（通常のロボットの経路探索方法）**
+   - ロボットが注文を受ける
+   - ロボットが経路を計画する
+   - ロボットが行動する
+   - レストランの作成
+2. **RAG（Retrieval-Augmented Generation）の構築**：
+   - 知識ベースの作成（ベクトルデータベース）
+   - リトリーバー
+   - LLMリクエスト
+3. **RAG（Retrieval-Augmented Generation）ロボットの構築**：
+   - RAGを通常のロボットに接続する
 
-## 二、实验数据
+## 二、実験データ
 
-- **当前数据**：
-  - 配送总时间，配送总路程，订单平均等待时间
-- **可扩展数据**：
-  - 障碍
-  - 突发状况
-  - ？？？
+- **現在のデータ**：
+  - 配送総時間、配送総距離、注文平均待ち時間
+- **拡張可能なデータ**：
+  - 障害物
+  - 突発的な状況
+  - その他
 
 ---
 
-## 目录结构
+## ディレクトリ構造
 
 ```text
 ragaid-bot/
-├─ app/                       # Streamlit Web 应用
-│  ├─ constants.py            # 常量定义
-│  ├─ handlers.py             # UI 事件处理
-│  ├─ main.py                 # 应用主逻辑
-│  ├─ simulation.py           # 模拟引擎
-│  ├─ state.py                # 状态管理
-│  ├─ ui.py                   # UI 组件
-│  ├─ utils.py                # 工具函数
+├─ app/                       # Streamlit Webアプリケーション
+│  ├─ constants.py            # 定数定義
+│  ├─ handlers.py             # UIイベント処理
+│  ├─ main.py                 # アプリケーションのメインロジック
+│  ├─ simulation.py           # シミュレーションエンジン
+│  ├─ state.py                # 状態管理
+│  ├─ ui.py                   # UIコンポーネント
+│  ├─ utils.py                # ユーティリティ関数
 │  └─ __init__.py
-├─ restaurant/                # 餐厅网格 & 预置布局文件
-│  ├─ restaurant_layout.py    # 布局解析与 API
-│  ├─ restaurant.py           # `Restaurant` 类
-│  ├─ layouts.json            # 多个预置布局示例
-│  └─ README.md               # 子包说明
-├─ robot/                     # 机器人核心逻辑
+├─ restaurant/                # レストラングリッド & 事前設定レイアウトファイル
+│  ├─ restaurant_layout.py    # レイアウト解析とAPI
+│  ├─ restaurant.py           # `Restaurant`クラス
+│  ├─ layouts.json            # 複数の事前設定レイアウト例
+│  └─ README.md               # サブパッケージの説明
+├─ robot/                     # ロボットのコアロジック
 │  ├─ robot.py                # `Robot` & `AIEnhancedRobot`
-│  ├─ motion_controller.py    # 执行层
-│  ├─ planner.py              # 路径规划与订单管理
-│  ├─ rag/                    # RAG 子包
-│  │  ├─ knowledge            # 默认知识库
+│  ├─ motion_controller.py    # 実行レイヤー
+│  ├─ planner.py              # 経路計画と注文管理
+│  ├─ rag/                    # RAGサブパッケージ
+│  │  ├─ knowledge            # デフォルト知識ベース
 │  │  │  └─ restaurant_rule.json
-│  │  ├─ llm_client.py        # LLM 接口封装
-│  │  ├─ knowledge_base.py    # 知识库加载与索引
-│  │  ├─ retriever.py         # 向量检索
-│  │  ├─ prompt_helper.py     # Prompt 构建与简化
-│  │  ├─ rag_module.py        # 决策接口
-│  │  └─ README.md            # 子包说明
+│  │  ├─ llm_client.py        # LLMインターフェースラッパー
+│  │  ├─ knowledge_base.py    # 知識ベースのロードとインデックス作成
+│  │  ├─ retriever.py         # ベクトル検索
+│  │  ├─ prompt_helper.py     # プロンプト構築と簡略化
+│  │  ├─ rag_module.py        # 意思決定インターフェース
+│  │  └─ README.md            # サブパッケージの説明
 │  └─ __init__.py
-├─ app.py                     # Streamlit 入口
+├─ app.py                     # Streamlitエントリーポイント
 ├─ Dockerfile
 ├─ docker-compose.yml
-├─ requirements.txt           # 依赖列表
-├─ memo.md                    # 开发备忘
+├─ requirements.txt           # 依存リスト
+├─ memo.md                    # 開発メモ
 ├─ .gitignore
 ```
 
 ---
 
-## 快速开始
+## クイックスタート
 
-- 安装Docker并启动:
+- Dockerをインストールして起動:
 
 ```bash
 docker compose up --build
 ```
 
-- 访问：[http://localhost:8501]
+- アクセス先：[http://localhost:8501]
 
-## 未来改进
+## 将来の改善点
 
-- 暂无
+- なし

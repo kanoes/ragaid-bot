@@ -1,7 +1,7 @@
-# robot.rag — 检索与生成 (RAG) 子包
+# robot.rag — 検索と生成 (RAG) サブパッケージ
 
-本子包为 `AIEnhancedRobot` 提供检索 + 生成能力，用于在遇到障碍或特殊场景时基于知识库与 LLM 作出**可执行决策**（`reroute`/`wait`/`report_unreachable`）。
-大致流程图如下：
+このサブパッケージは `AIEnhancedRobot` に検索 + 生成機能を提供し、障害物や特殊なシーンに遭遇した際に知識ベースとLLMに基づいて**実行可能な決定**（`reroute`/`wait`/`report_unreachable`）を行うために使用されます。
+大まかなフロー図は以下の通りです：
 
 ```text
 ┌────────────┐      query              ┌───────────────────┐
@@ -15,47 +15,47 @@
 
 ---
 
-## 目录结构
+## ディレクトリ構造
 
 ```text
 robot/rag/
-├─ knowledge/           # 默认知识库目录
+├─ knowledge/           # デフォルト知識ベースディレクトリ
 │  └─ restaurant_rule.json
-├─ llm_client.py        # OpenAI Embedding & Chat 封装
-├─ knowledge_base.py    # 知识库加载与 FAISS 索引
-├─ retriever.py         # 向量检索组件
-├─ prompt_helper.py     # 构造 & 简化 Prompt
-├─ rag_module.py        # `RAGModule` 核心类
-└─ README.md            # 本说明文档
+├─ llm_client.py        # OpenAI Embedding & Chat ラッパー
+├─ knowledge_base.py    # 知識ベースのロードとFAISS索引
+├─ retriever.py         # ベクトル検索コンポーネント
+├─ prompt_helper.py     # Promptの構築 & 簡略化
+├─ rag_module.py        # `RAGModule` コアクラス
+└─ README.md            # この説明ドキュメント
 ```
 
 ---
 
-## 环境变量
+## 環境変数
 
-- `OPENAI_API_KEY`：OpenAI 访问令牌（必需）
-- `EMBEDDING_MODEL`：向量化模型，默认 `text-embedding-ada-002`
-- `COMPLETION_MODEL`：对话模型，默认 `gpt-4o`
-- `TEMPERATURE`：生成温度，默认 `0.4`(未使用)
-- `TOP_K`：检索条数，默认 `3`(未使用)
+- `OPENAI_API_KEY`：OpenAI アクセストークン（必須）
+- `EMBEDDING_MODEL`：ベクトル化モデル、デフォルト `text-embedding-ada-002`
+- `COMPLETION_MODEL`：対話モデル、デフォルト `gpt-4o`
+- `TEMPERATURE`：生成温度、デフォルト `0.4`（未使用）
+- `TOP_K`：検索件数、デフォルト `3`（未使用）
 
-可在项目根目录创建 `.env` 文件配置。
+プロジェクトのルートディレクトリに `.env` ファイルを作成して設定できます。
 
 ---
 
-## 快速测试
+## クイックテスト
 
-- 安装Docker并启动:
+- Dockerをインストールして起動:
 
 ```bash
 docker compose up --build
 ```
 
-- 访问：[http://localhost:8501]
+- アクセス先：[http://localhost:8501]
 
-- 在应用中进行测试
+- アプリケーションでテスト
 
-## 改进建议
+## 改善提案
 
-- 目前还只是测试版RAG，尚未真正集成检索。
-- 在 `retriever.py` 中支持增量更新知识库和嵌入索引，以便在运行时快速加载新的规则，并在 `prompt_helper.py` 中加入对多轮对话上下文的管理，以提升决策准确度。
+- 現時点ではまだテスト版RAGであり、検索が本当に統合されていません。
+- `retriever.py` で知識ベースと埋め込みインデックスの増分更新をサポートし、実行時に新しいルールを迅速にロードできるようにし、`prompt_helper.py` で複数回の対話コンテキスト管理を追加して、決定の精度を向上させる。

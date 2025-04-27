@@ -1,12 +1,12 @@
 """
-餐厅送餐机器人模拟系统 - App 包
+レストラン配達ロボットシミュレーションシステム - Appパッケージ
 """
 
 def run():
     """
-    启动Streamlit应用
+    Streamlitアプリケーションを起動
     """
     from .main import run as main_run
     main_run()
 
-__all__ = ["run"] 
+__all__ = ["run"]
