@@ -20,7 +20,7 @@ from .constants import LAYOUT_DIR, RAG_KB_DIR, EMPTY_STYLE, WALL_STYLE, TABLE_ST
 
 def available_layouts(layout_dir=LAYOUT_DIR):
     """
-    获取可用的餐厅布局列表
+    获取可用的レストランレイアウト列表
     """
     # 检查是否存在新式布局文件
     new_format_path = os.path.join(layout_dir, "layouts.json")
@@ -40,7 +40,7 @@ def available_layouts(layout_dir=LAYOUT_DIR):
 
 def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
     """
-    从字符串数组解析餐厅布局
+    从字符串数组解析レストランレイアウト
     
     Args:
         layout_name: 布局名称
@@ -96,10 +96,10 @@ def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
 
 def display_restaurant_ascii(restaurant, restaurant_name=None):
     """
-    显示ASCII格式的餐厅布局
+    显示ASCII格式的レストランレイアウト
     
     Args:
-        restaurant: 餐厅对象或餐厅布局对象
+        restaurant: 餐厅对象或レストランレイアウト对象
         restaurant_name: 餐厅名称（可选）
     """
     layout = getattr(restaurant, 'layout', restaurant)
@@ -117,7 +117,7 @@ def display_restaurant_ascii(restaurant, restaurant_name=None):
     }
     
     # 打印标题
-    print(f"餐厅布局: {name} ({layout.width}x{layout.height})")
+    print(f"レストランレイアウト: {name} ({layout.width}x{layout.height})")
     print("-" * (layout.width * 2 + 3))
     
     # 反向查找表格ID
@@ -143,7 +143,7 @@ def display_restaurant_ascii(restaurant, restaurant_name=None):
 
 def load_restaurant(layout_name, layout_dir=LAYOUT_DIR):
     """
-    加载餐厅布局
+    加载レストランレイアウト
     """
     new_format_path = os.path.join(layout_dir, "layouts.json")
     if not os.path.exists(new_format_path):
@@ -162,7 +162,7 @@ def load_restaurant(layout_name, layout_dir=LAYOUT_DIR):
 
 def save_restaurant_layout(layout_data, layout_dir=LAYOUT_DIR):
     """
-    保存餐厅布局到JSON文件
+    保存レストランレイアウト到JSON文件
     
     Args:
         layout_data: dict, 包含布局数据
@@ -219,7 +219,7 @@ def save_restaurant_layout(layout_data, layout_dir=LAYOUT_DIR):
 
 def save_layouts_to_single_file(layouts: List[Dict[str, Any]], layout_dir=LAYOUT_DIR):
     """
-    将多个餐厅布局保存到单一的layouts.json文件
+    将多个レストランレイアウト保存到单一的layouts.json文件
     
     Args:
         layouts: 布局数据列表，每个元素包含name和grid
@@ -245,7 +245,7 @@ def save_layouts_to_single_file(layouts: List[Dict[str, Any]], layout_dir=LAYOUT
 
 def delete_restaurant_layout(layout_name, layout_dir=LAYOUT_DIR):
     """
-    删除餐厅布局文件
+    删除レストランレイアウト文件
     
     Args:
         layout_name: 布局名称
@@ -307,7 +307,7 @@ def create_rich_layout(grid, height, width, tables,
                        robot_position: Optional[Tuple[int, int]] = None,
                        highlight_path: Optional[list] = None):
     """
-    创建富文本格式的餐厅布局
+    创建富文本格式的レストランレイアウト
     
     Args:
         grid: 餐厅网格数据
@@ -390,7 +390,7 @@ def create_rich_restaurant_panel(restaurant,
                                 highlight_path=None,
                                 title_suffix=""):
     """
-    创建富文本格式的餐厅布局面板
+    创建富文本格式的レストランレイアウト面板
     
     Args:
         restaurant: 餐厅对象

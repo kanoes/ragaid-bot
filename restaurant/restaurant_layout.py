@@ -19,7 +19,7 @@ from typing import List, Tuple, Dict, Optional
 
 class RestaurantLayout:
     """
-    二维网格的餐厅布局
+    二维网格的レストランレイアウト
     """
 
     # ----- 构造 -------------------------------------------------------------- #
@@ -112,7 +112,7 @@ class RestaurantLayout:
     @staticmethod
     def parse_layout_from_array(layout_name: str, grid_array: List[List[int]]):
         """
-        从数字数组解析餐厅布局（新格式）
+        从数字数组解析レストランレイアウト（新格式）
         
         数字编码:
         0: 空地
