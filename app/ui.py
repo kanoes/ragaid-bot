@@ -8,8 +8,6 @@ import numpy as np
 from rich.text import Text
 from streamlit_plotly_events import plotly_events
 import pandas as pd
-import time
-import os
 
 from .state import (
     get_editor_height,
@@ -294,16 +292,6 @@ def render_stats(stats):
     基本統計情報を表示
     """
     st.subheader("今回のシミュレーションデータ")
-    
-    # 指標を表示 - total_stepsを削除
-    metrics = {
-        "total_orders": "総注文数",
-        "total_time": "総配達時間",
-        "avg_waiting_time": "平均注文待ち時間",
-        "総配送路程": "総配達距離",
-        "レストランレイアウト": "レストランレイアウト",
-        "ロボットタイプ": "ロボットタイプ",
-    }
     
     if stats:
         # レストランレイアウト名を追加
@@ -1273,7 +1261,6 @@ def render_interactive_editor_grid():
     for i in range(height):
         row_texts = []
         for j in range(width):
-            cell_type = grid[i][j]
             cell_desc = get_cell_description(i, j)
             row_texts.append(cell_desc)
         hover_texts.append(row_texts)

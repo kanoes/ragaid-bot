@@ -13,12 +13,9 @@ from __future__ import annotations
 
 import logging
 import os
-import math
 from typing import List, Optional, Tuple, Deque
 from collections import deque
-import numpy as np
 import time
-import random
 
 from restaurant.restaurant_layout import RestaurantLayout
 from robot.motion_controller import MotionController
@@ -138,9 +135,6 @@ class Robot:
         
         # 現在のバッチに追加
         self.current_batch_orders.append(order)
-        
-        # 注文待ち時間の計算（作成から配達開始まで）
-        waiting_time = time.time() - order.created_time
         
         # テーブルに対応する配達ポイントを取得
         delivery_pos = self.layout.get_delivery_point(order.table_id)
