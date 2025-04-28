@@ -457,7 +457,7 @@ def render_plotly_robot_path(_restaurant, path_history, orders=None, title="ロ�
         )
     )
 
-    # テキスト注釋を追加 - ラベルを表示
+    # テキストコメントを追加 - ラベルを表示
     for i in range(height):
         for j in range(width):
             if labels[i][j]:
@@ -492,7 +492,7 @@ def render_plotly_robot_path(_restaurant, path_history, orders=None, title="ロ�
             )
         )
         
-        # 突出表示出発点
+        # 出発点を強調表示
         fig.add_trace(
             go.Scatter(
                 x=[start_point[1]],
@@ -516,7 +516,7 @@ def render_plotly_robot_path(_restaurant, path_history, orders=None, title="ロ�
         # 判断終点が出発点と同じかどうか
         is_same_point = start_point == end_point
         
-        # 突出表示終点/現在位置
+        # 終点を強調表示
         fig.add_trace(
             go.Scatter(
                 x=[end_point[1]],
@@ -538,7 +538,7 @@ def render_plotly_robot_path(_restaurant, path_history, orders=None, title="ロ�
             )
         )
         
-        # もし注文情報が提供された場合、配送順に基づいて注釋を追加
+        # もし注文情報が提供された場合、配送順に基づいてコメントを追加
         if orders:
             # すべてのテーブルの配達点を取得
             table_delivery_points = {}
@@ -547,18 +547,17 @@ def render_plotly_robot_path(_restaurant, path_history, orders=None, title="ロ�
                 if delivery_pos:
                     table_delivery_points[table_id] = delivery_pos
 
-            # 尝试按配送顺序排序
+            # 配送順に基づいてコメントを追加
             sorted_orders = sorted(orders, key=lambda x: x.get('delivery_sequence', float('inf')))
 
-            # 配送順に基づいて注釋を追加
             for order in sorted_orders:
                 table_id = order.get('table_id')
                 order_id = order.get('order_id')
                 delivery_seq = order.get('delivery_sequence')
                 
-                # 配送順が注釋された注文のみを注釋
+                # 配送順がコメントされた注文のみをコメント
                 if delivery_seq and table_id in table_delivery_points:
-                    # 配送目標点を使用して注釋
+                    # 配送目標点を使用してコメント
                     delivery_pos = table_delivery_points[table_id]
                     
                     # 配送順を注釋して注文IDを注釋
@@ -649,21 +648,21 @@ def render_plotly_robot_path(_restaurant, path_history, orders=None, title="ロ�
 @st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
 def render_plotly_stats_extended(stats_data, custom_metrics=None):
     """
-    渲染扩展的统计数据可视化，支持自定义指标
+    拡張統計データの視覚化をレンダリングし、カスタム指標をサポート
 
-    参数:
-    - stats_data: dict，统计数据字典
-    - custom_metrics: dict，自定义指标配置，格式为{'指标名称': {'color': 颜色, 'format': 格式化函数}}
+    パラメータ:
+    - stats_data: dict，統計データ辞書
+    - custom_metrics: dict，カスタム指標の設定、フォーマット: {'指標名': {'color': 色, 'format': フォーマット関数}}
     """
     if not stats_data:
         return
         
-    # 获取累积的历史批次数据
+    # 累積のバッチ履歴データを取得
     batch_histories = get_batch_histories()
 
     st.header("高级统计分析")
 
-    # 默认的指标配置
+    # デフォルトの指標設定
     default_metrics = {
         "total_orders": {"color": "#00cc66", "format": lambda x: int(x)},
         "total_batches": {"color": "#ff9900", "format": lambda x: int(x)},
@@ -672,67 +671,67 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
         "平均每订单步数": {"color": "#2196f3", "format": lambda x: f"{x:.2f}"}
     }
 
-    # 合并自定义指标
+    # カスタム指標を統合
     metrics = default_metrics.copy()
     if custom_metrics:
         metrics.update(custom_metrics)
 
-    # 准备数据
+    # データを準備
     data = []
 
-    # 添加基础统计
+    # 基本統計
     data.append(
         {
-            "指标": "総注文数",
-            "值": stats_data.get("total_orders", 0),
-            "颜色": metrics.get("total_orders", {}).get("color", "#00cc66"),
+            "指標": "総注文数",
+            "値": stats_data.get("total_orders", 0),
+            "色": metrics.get("total_orders", {}).get("color", "#00cc66"),
         }
     )
     data.append(
         {
-            "指标": "総批次数",
-            "值": stats_data.get("total_batches", 0),
-            "颜色": metrics.get("total_batches", {}).get("color", "#ff9900"),
+            "指標": "総批次数",
+            "値": stats_data.get("total_batches", 0),
+            "色": metrics.get("total_batches", {}).get("color", "#ff9900"),
         }
     )
     
-    # 添加路径长度指标
+    # 配送路程指標を追加
     data.append(
         {
-            "指标": "総配送路程",
-            "值": stats_data.get("総配送路程", 0),
-            "颜色": metrics.get("総配送路程", {}).get("color", "#4da6ff"),
+            "指標": "総配送路程",
+            "値": stats_data.get("総配送路程", 0),
+            "色": metrics.get("総配送路程", {}).get("color", "#4da6ff"),
         }
     )
 
-    # 添加平均值指标
+    # 平均値指標を追加
     for key in ["平均每批次订单数", "平均每订单步数", "平均每订单配送时间"]:
         if key in stats_data:
             metric_config = metrics.get(
                 key, {"color": "#9467bd", "format": lambda x: f"{x:.2f}"}
             )
-            data.append({"指标": key, "值": stats_data[key], "颜色": metric_config["color"]})
+            data.append({"指標": key, "値": stats_data[key], "色": metric_config["color"]})
 
-    # 添加其他统计指标
+    # 他の統計指標を追加
     for key, value in stats_data.items():
         if key not in ["total_orders", "total_batches", "総配送路程", "平均每批次订单数", "平均每订单步数", "平均每订单配送时间", "配送履歴"]:
             metric_config = metrics.get(
                 key, {"color": "#9467bd", "format": lambda x: x}
             )
-            data.append({"指标": key, "值": value, "颜色": metric_config["color"]})
+            data.append({"指標": key, "値": value, "色": metric_config["color"]})
 
-    # 创建图表
-    tabs = st.tabs(["配送性能", "雷达图", "历史批次分析"])
+    # グラフを作成
+    tabs = st.tabs(["配送性能", "レーダーチャート", "履歴バッチ分析"])
 
     with tabs[0]:
         # 棒グラフ
         fig_bar = go.Figure()
         fig_bar.add_trace(
             go.Bar(
-                x=[item["指标"] for item in data],
-                y=[item["值"] for item in data],
-                marker_color=[item["颜色"] for item in data],
-                text=[format_value(item["指标"], item["值"], metrics) for item in data],
+                x=[item["指標"] for item in data],
+                y=[item["値"] for item in data],
+                marker_color=[item["色"] for item in data],
+                text=[format_value(item["指標"], item["値"], metrics) for item in data],
                 textposition="auto",
             )
         )
@@ -774,18 +773,18 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
         st.plotly_chart(fig_radar, use_container_width=True)
 
     with tabs[2]:
-        # 批次历史分析
-        if batch_histories:  # 優先使用累積的历史批次数据
-            # 将历史数据转换为DataFrame进行分析
+        # バッチ履歴分析
+        if batch_histories:  # 累積のバッチ履歴データを優先使用
+            # 履歴データをDataFrameに変換して分析
             history_df = pd.DataFrame(batch_histories)
             
-            # 批次订单数分布
+            # バッチ注文数分布
             if "orders_count" in history_df.columns:
-                st.subheader("批次订单数分布")
+                st.subheader("バッチ注文数分布")
                 fig_batch = go.Figure()
                 fig_batch.add_trace(
                     go.Bar(
-                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        x=[f"バッチ {i+1}" for i in range(len(history_df))],
                         y=history_df["orders_count"],
                         marker_color="#4da6ff",
                         text=history_df["orders_count"],
@@ -793,20 +792,20 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_batch.update_layout(
-                    title="各批次订单数量",
-                    xaxis=dict(title="批次"),
-                    yaxis=dict(title="订单数量"),
+                    title="各バッチ注文数量",
+                    xaxis=dict(title="バッチ"),
+                    yaxis=dict(title="注文数量"),
                     height=300,
                 )
                 st.plotly_chart(fig_batch, use_container_width=True)
             
-            # 批次路径长度分布
+            # バッチ配送路程分布
             if "path_length" in history_df.columns:
-                st.subheader("批次路径长度分布")
+                st.subheader("バッチ配送路程分布")
                 fig_path = go.Figure()
                 fig_path.add_trace(
                     go.Bar(
-                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        x=[f"バッチ {i+1}" for i in range(len(history_df))],
                         y=history_df["path_length"],
                         marker_color="#00cc66",
                         text=history_df["path_length"],
@@ -814,20 +813,20 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_path.update_layout(
-                    title="各批次路径长度",
-                    xaxis=dict(title="批次"),
-                    yaxis=dict(title="路径长度"),
+                    title="各バッチ配送路程",
+                    xaxis=dict(title="バッチ"),
+                    yaxis=dict(title="配送路程"),
                     height=300,
                 )
                 st.plotly_chart(fig_path, use_container_width=True)
                 
-            # 批次配送时间分布
+            # バッチ配送时间分布
             if "duration" in history_df.columns:
-                st.subheader("批次配送时间分布")
+                st.subheader("バッチ配送时间分布")
                 fig_duration = go.Figure()
                 fig_duration.add_trace(
                     go.Bar(
-                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        x=[f"バッチ {i+1}" for i in range(len(history_df))],
                         y=history_df["duration"],
                         marker_color="#ff9900",
                         text=[f"{d:.2f}" for d in history_df["duration"]],
@@ -835,23 +834,23 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_duration.update_layout(
-                    title="各批次配送时间(秒)",
-                    xaxis=dict(title="批次"),
+                    title="各バッチ配送时间(秒)",
+                    xaxis=dict(title="バッチ"),
                     yaxis=dict(title="时间(秒)"),
                     height=300,
                 )
                 st.plotly_chart(fig_duration, use_container_width=True)
-        elif "配送履歴" in stats_data and stats_data["配送履歴"]:  # 如果没あり累积数据，使用当前模拟数据
-            # 将历史数据转换为DataFrame进行分析
+        elif "配送履歴" in stats_data and stats_data["配送履歴"]:
+            # 履歴データをDataFrameに変換して分析
             history_df = pd.DataFrame(stats_data["配送履歴"])
             
-            # 批次订单数分布
+            # バッチ注文数分布
             if "orders_count" in history_df.columns:
-                st.subheader("批次订单数分布")
+                st.subheader("バッチ注文数分布")
                 fig_batch = go.Figure()
                 fig_batch.add_trace(
                     go.Bar(
-                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        x=[f"バッチ {i+1}" for i in range(len(history_df))],
                         y=history_df["orders_count"],
                         marker_color="#4da6ff",
                         text=history_df["orders_count"],
@@ -859,20 +858,20 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_batch.update_layout(
-                    title="各批次订单数量",
-                    xaxis=dict(title="批次"),
-                    yaxis=dict(title="订单数量"),
+                    title="各バッチ注文数量",
+                    xaxis=dict(title="バッチ"),
+                    yaxis=dict(title="注文量"),
                     height=300,
                 )
                 st.plotly_chart(fig_batch, use_container_width=True)
             
-            # 批次路径长度分布
+            # バッチ配送路程分布
             if "path_length" in history_df.columns:
-                st.subheader("批次路径长度分布")
+                st.subheader("バッチ配送距離分布")
                 fig_path = go.Figure()
                 fig_path.add_trace(
                     go.Bar(
-                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        x=[f"バッチ {i+1}" for i in range(len(history_df))],
                         y=history_df["path_length"],
                         marker_color="#00cc66",
                         text=history_df["path_length"],
@@ -880,20 +879,20 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_path.update_layout(
-                    title="各批次路径长度",
-                    xaxis=dict(title="批次"),
-                    yaxis=dict(title="路径长度"),
+                    title="各バッチ配送路程",
+                    xaxis=dict(title="バッチ"),
+                    yaxis=dict(title="配送距離"),
                     height=300,
                 )
                 st.plotly_chart(fig_path, use_container_width=True)
                 
-            # 批次配送时间分布
+            # バッチ配送时间分布
             if "duration" in history_df.columns:
-                st.subheader("批次配送时间分布")
+                st.subheader("バッチ配送时间分布")
                 fig_duration = go.Figure()
                 fig_duration.add_trace(
                     go.Bar(
-                        x=[f"批次 {i+1}" for i in range(len(history_df))],
+                        x=[f"バッチ {i+1}" for i in range(len(history_df))],
                         y=history_df["duration"],
                         marker_color="#ff9900",
                         text=[f"{d:.2f}" for d in history_df["duration"]],
@@ -901,14 +900,14 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_duration.update_layout(
-                    title="各批次配送时间(秒)",
-                    xaxis=dict(title="批次"),
+                    title="各バッチ配送时间(秒)",
+                    xaxis=dict(title="バッチ"),
                     yaxis=dict(title="时间(秒)"),
                     height=300,
                 )
                 st.plotly_chart(fig_duration, use_container_width=True)
         else:
-            st.info("暂なし批次历史数据")
+            st.info("バッチ履歴データなし")
 
     return data
 
@@ -916,9 +915,6 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
 def render_layout_editor():
     """
     レストランレイアウトエディタをレンダリングし、ユーザーがレイアウトを作成、編集、削除できるようにする
-
-    戻り値:
-        dict: 编辑后的布局信息，如果没あり改变则返回None
     """
     st.header("レストランレイアウトエディタ")
 
@@ -930,7 +926,7 @@ def render_layout_editor():
             "高さ", min_value=3, max_value=30, value=current_height, key="editor_height_input"
         )
         if new_height != current_height:
-            # 调整高さ时保留现あり数据
+            # 高さを変更するときは現在のデータを保持
             current_grid = get_editor_grid()
             current_width = get_editor_width()
             new_grid = [[0 for _ in range(current_width)] for _ in range(new_height)]
@@ -940,7 +936,7 @@ def render_layout_editor():
             set_editor_grid(new_grid)
             set_editor_height(new_height)
 
-            # 检查并移除超出范围的特殊位置
+            # テーブル位置を更新
             tables = get_editor_tables()
             tables = {k: v for k, v in tables.items() if v[0] < new_height}
             set_editor_tables(tables)
@@ -961,7 +957,7 @@ def render_layout_editor():
             "幅", min_value=3, max_value=30, value=current_width, key="editor_width_input"
         )
         if new_width != current_width:
-            # 调整幅时保留现あり数据
+            # 幅を変更するときは現在のデータを保持
             current_grid = get_editor_grid()
             current_height = get_editor_height()
             new_grid = [[0 for _ in range(new_width)] for _ in range(current_height)]
@@ -971,7 +967,7 @@ def render_layout_editor():
             set_editor_grid(new_grid)
             set_editor_width(new_width)
 
-            # 检查并移除超出范围的特殊位置
+            # テーブル位置を更新
             tables = get_editor_tables()
             tables = {k: v for k, v in tables.items() if v[1] < new_width}
             set_editor_tables(tables)
@@ -993,28 +989,28 @@ def render_layout_editor():
             set_editor_layout_name(layout_name)
 
     # レイアウト編集用の視覚的インターフェースを作成
-    st.subheader("编辑布局")
+    st.subheader("レイアウト編集")
     st.write("グリッドセルをクリックしてタイプを変更")
 
-    # 创建多行列布局，美化界面
+    # レイアウト編集用の多行列レイアウトを作成
     edit_col1, edit_col2 = st.columns([3, 1])
     
     with edit_col2:
         st.write("**要素ツールボックス**")
         # 編集する要素タイプを選択
         element_type = st.radio(
-            "选择元素类型", 
-            ["墙壁/障碍", "空地", "テーブル", "キッチン", "駐車スポット"],
+            "要素タイプを選択", 
+            ["壁/障害物", "空地", "テーブル", "キッチン", "駐車スポット"],
             captions=["#", ".", "A-Z", "厨", "停"],
             key="element_type_radio"
         )
         
-        # 元素类型映射到数值
-        type_map = {"墙壁/障碍": 1, "空地": 0, "テーブル": 2, "キッチン": 3, "駐車スポット": 4}
+        # 要素タイプを数値にマッピング
+        type_map = {"壁/障害物": 1, "空地": 0, "テーブル": 2, "キッチン": 3, "駐車スポット": 4}
         
-        # 显示当前元素的颜色提示
+        # 現在の要素の色を表示
         element_colors = {
-            "墙壁/障碍": "#333333",
+            "壁/障害物": "#333333",
             "空地": "white",
             "テーブル": "#00cc66",
             "キッチン": "#f5c518",
@@ -1031,7 +1027,7 @@ def render_layout_editor():
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                color: {"black" if element_type != "墙壁/障碍" else "white"};
+                color: {"black" if element_type != "壁/障害物" else "white"};
                 font-weight: bold;
             ">
                 {element_type}
@@ -1047,7 +1043,7 @@ def render_layout_editor():
             if table_id and (not table_id.isalpha() or len(table_id) != 1):
                 st.warning("テーブルIDは1文字のアルファベット(A-Z)でなければなりません")
                 
-        # 显示统计信息
+        # レイアウト統計を表示
         st.write("**レイアウト統計**")
         tables = get_editor_tables()
         kitchen = get_editor_kitchen()
@@ -1060,10 +1056,10 @@ def render_layout_editor():
         - 駐車スポット: {"あり" if parking else "なし"}
         """)
         
-        # 操作按钮
+        # 操作ボタン
         st.write("**操作**")
         if st.button("レイアウトをリセット", key="editor_reset_button"):
-            # 重置为空白布局
+            # 空白レイアウトにリセット
             reset_editor()
             st.rerun()
             
@@ -1083,24 +1079,24 @@ def render_layout_editor():
                 grid[i][0] = 1
                 grid[i][width - 1] = 1
 
-            # 更新网格
+            # レイアウトを更新
             set_editor_grid(grid)
             st.rerun()
     
     with edit_col1:
-        # 创建Plotly图表以便交互编辑
+        # Plotly图表を作成して交互編集を可能にする
         fig = render_interactive_editor_grid()
         
-        # 使用 plotly_events 展示图表并监听点击事件
+        # plotly_events を使用して図表を表示し、クリックイベントを監視
         clicked_point = plotly_events(fig, click_event=True, key="layout_editor_plotly")
         
         if clicked_point:
-            # 获取点击的坐标
+            # クリックされた座標を取得
             try:
                 point_data = clicked_point[0]
                 row, col = int(point_data["y"]), int(point_data["x"])
                 
-                # 获取当前状态
+                # 現在の状態を取得
                 grid = get_editor_grid()
                 tables = get_editor_tables()
                 kitchen = get_editor_kitchen()
@@ -1108,7 +1104,7 @@ def render_layout_editor():
                 height = get_editor_height()
                 width = get_editor_width()
 
-                # 根据选择的元素类型进行修改
+                # 選択された要素タイプに応じて変更
                 if 0 <= row < height and 0 <= col < width:
                     if (
                         element_type == "テーブル"
@@ -1116,16 +1112,16 @@ def render_layout_editor():
                         and table_id.isalpha()
                         and len(table_id) == 1
                     ):
-                        # 处理テーブル - 需要存储テーブルID和位置
-                        # 先检查该ID是否已被使用
+                        # テーブルの処理 - テーブルIDと位置を保存する必要がある
+                        # まず、このIDがすでに使用されているか確認
                         table_id_upper = table_id.upper()
                         if table_id_upper in tables and tables[table_id_upper] != (row, col):
-                            # 如果已存在此ID但位置不同，找到并清除旧位置
+                            # もし同じIDが存在して位置が異なる場合、古い位置を見つけて削除
                             old_row, old_col = tables[table_id_upper]
-                            if grid[old_row][old_col] == 2:  # 确保旧位置确实是テーブル
-                                grid[old_row][old_col] = 0  # 设为空地
+                            if grid[old_row][old_col] == 2:  # 古い位置が確かにテーブルであることを確認
+                                grid[old_row][old_col] = 0  # 空地に設定
                                 
-                        # 检查该位置是否已あり其他テーブル
+                        # この位置に他のテーブルがあるか確認
                         table_to_remove = None
                         for tid, pos in tables.items():
                             if pos == (row, col) and tid != table_id_upper:
@@ -1148,18 +1144,18 @@ def render_layout_editor():
                         if parking:
                             old_row, old_col = parking
                             if grid[old_row][old_col] == 4:
-                                grid[old_row][old_col] = 0  # 设为空地
+                                grid[old_row][old_col] = 0  # 空地に設定
 
                         grid[row][col] = type_map[element_type]
                         set_editor_parking((row, col))
                     else:
-                        # 处理墙壁或空地
+                        # 特殊位置を変更
                         old_value = grid[row][col]
                         grid[row][col] = type_map[element_type]
 
-                        # 如果将某个特殊位置设为墙壁或空地，需要从相应列表中移除
-                        # 检查和清理テーブル
-                        if old_value == 2:  # 原来是テーブル
+                        # 特殊位置を墙壁或空地に設定すると、その位置をリストから削除する必要がある
+                        # テーブルの処理
+                        if old_value == 2:
                             tables_to_remove = []
                             for tid, pos in tables.items():
                                 if pos == (row, col):
@@ -1168,39 +1164,39 @@ def render_layout_editor():
                                 del tables[tid]
                             set_editor_tables(tables)
 
-                        # 检查和清理キッチン
-                        if old_value == 3 and (row, col) in kitchen:  # 原来是キッチン
+                        # キッチンの処理
+                        if old_value == 3 and (row, col) in kitchen:
                             kitchen.remove((row, col))
                             set_editor_kitchen(kitchen)
 
-                        # 检查和清理駐車スポット
-                        if old_value == 4 and parking == (row, col):  # 原来是駐車スポット
+                        # 駐車スポットの処理
+                        if old_value == 4 and parking == (row, col):
                             set_editor_parking(None)
 
-                    # 更新网格
+                    # レイアウトを更新
                     set_editor_grid(grid)
 
-                    # 强制重新渲染
+                    # 強制的に再レンダリング
                     st.rerun()
             except (KeyError, IndexError) as e:
-                st.error(f"なし法处理点击: {e}")
+                st.error(f"クリック位置の処理に失敗: {e}")
     
-    # レイアウトを保存按钮
+    # レイアウトを保存ボタン
     st.write("")
     save_col1, save_col2 = st.columns([3, 1])
     
     with save_col1:
-        st.write("**レイアウトの編集を完了したら、保存をクリック：**")
+        st.write("**レイアウトの編集を完了したら、保存をクリックしてください：**")
         
     with save_col2:
         if st.button("レイアウトを保存", key="editor_save_layout_button", type="primary"):
-            # 验证布局是否あり效
+            # レイアウトが有効かどうかを検証
             is_valid, message = validate_layout_extended()
             if not is_valid:
-                st.error(f"布局なし效! {message}")
+                st.error(f"レイアウトが有効ではありません! {message}")
                 return None
 
-            # 返回当前编辑的布局数据
+            # 現在編集しているレイアウトデータを返す
             return {
                 "name": get_editor_layout_name(),
                 "grid": get_editor_grid(),
@@ -1213,10 +1209,10 @@ def render_layout_editor():
 
 def render_interactive_editor_grid():
     """
-    渲染交互式可编辑的Plotlyレストランレイアウト网格，改进版本
+    交互式可编辑的Plotlyレストランレイアウト网格をレンダリング，改進版
 
     戻り値:
-        go.Figure: Plotly图表对象
+        go.Figure: Plotly図表オブジェクト
     """
     grid = get_editor_grid()
     height = get_editor_height()
@@ -1225,44 +1221,44 @@ def render_interactive_editor_grid():
     kitchen = get_editor_kitchen()
     parking = get_editor_parking()
 
-    # 创建颜色映射
+    # 色のマッピング
     colormap = {
         0: "white",         # 空地
-        1: "#333333",       # 墙壁/障碍
+        1: "#333333",       # 壁/障害物
         2: "#00cc66",       # テーブル
         3: "#f5c518",       # キッチン
         4: "#4da6ff",       # 駐車スポット
     }
 
-    # 创建标签映射
+    # ラベルのマッピング
     labels = [["" for _ in range(width)] for _ in range(height)]
 
-    # 设置テーブル标签
+    # テーブルのラベル
     for table_id, pos in tables.items():
         row, col = pos
         if 0 <= row < height and 0 <= col < width:  # 防止越界
             labels[row][col] = table_id
 
-    # 设置キッチン标签
+    # キッチンのラベル
     for row, col in kitchen:
         if 0 <= row < height and 0 <= col < width:  # 防止越界
             labels[row][col] = "厨"
 
-    # 设置駐車スポット标签
+    # 駐車スポットのラベル
     if parking:
         row, col = parking
         if 0 <= row < height and 0 <= col < width:  # 防止越界
             labels[row][col] = "停"
 
-    # 创建热力图数据
+    # 図表を作成
     fig = go.Figure()
 
-    # 添加热力图 - 显示颜色块
+    # 热力图のデータ
     heatmap_z = np.array(grid)
     colorscale = [
         [0, colormap[0]],      # 空地
         [0.2, colormap[0]],
-        [0.2, colormap[1]],    # 墙壁
+        [0.2, colormap[1]],    # 壁/障害物
         [0.4, colormap[1]],
         [0.4, colormap[2]],    # テーブル
         [0.6, colormap[2]],
@@ -1272,7 +1268,7 @@ def render_interactive_editor_grid():
         [1.0, colormap[4]],
     ]
 
-    # 生成每个单元格的悬停文本
+    # 各セルのホバーテキストを生成
     hover_texts = []
     for i in range(height):
         row_texts = []
@@ -1294,7 +1290,7 @@ def render_interactive_editor_grid():
         )
     )
 
-    # 添加文本注釋 - 显示标签
+    # テキスト注釈 - 表示ラベル
     for i in range(height):
         for j in range(width):
             if labels[i][j]:
@@ -1310,14 +1306,14 @@ def render_interactive_editor_grid():
                     ),
                 )
 
-    # 设置图表布局
+    # 図表のレイアウトを設定
     fig.update_layout(
-        width=min(800, max(400, width * 35)),  # 更合理的大小调整
+        width=min(800, max(400, width * 35)),
         height=min(800, max(400, height * 35)),
         margin=dict(l=0, r=0, t=10, b=0),
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(
-            showgrid=False,  # 不显示网格线，我们会自己添加
+            showgrid=False,
             zeroline=False,
             range=[-0.5, width - 0.5],
             tickvals=list(range(width)),
@@ -1325,25 +1321,22 @@ def render_interactive_editor_grid():
             tickfont=dict(size=10),
         ),
         yaxis=dict(
-            showgrid=False,  # 不显示网格线，我们会自己添加
+            showgrid=False,
             zeroline=False,
             scaleanchor="x",
             scaleratio=1,
-            range=[height - 0.5, -0.5],  # 反转Y轴使(0,0)在左上角
+            range=[height - 0.5, -0.5],
             tickvals=list(range(height)),
             ticktext=[str(i) for i in range(height)],
             tickfont=dict(size=10),
         ),
-        # 添加棋盘样式网格
         shapes=[
-            # 水平线
             *[dict(
                 type="line",
                 x0=-0.5, x1=width-0.5,
                 y0=i-0.5, y1=i-0.5,
                 line=dict(color="lightgrey", width=1)
             ) for i in range(height+1)],
-            # 垂直线
             *[dict(
                 type="line",
                 x0=j-0.5, x1=j-0.5,
@@ -1358,11 +1351,10 @@ def render_interactive_editor_grid():
         )
     )
 
-    # 添加额外的指导性提示
     fig.add_annotation(
         xref="paper", yref="paper",
         x=0.5, y=-0.07,
-        text="点击任意单元格应用当前选择的元素类型",
+        text="任意のセルをクリックして現在選択されている要素タイプを適用",
         showarrow=False,
         font=dict(size=12, color="grey"),
     )
@@ -1372,28 +1364,28 @@ def render_interactive_editor_grid():
 
 def validate_layout_extended():
     """
-    验证布局是否あり效，并提供详细的错误信息
+    レイアウトが有効かどうかを検証し、詳細なエラーメッセージを提供
     
     戻り値:
-        tuple: (is_valid, message) 布局是否あり效及详细信息
+        tuple: (is_valid, message) レイアウトが有効かどうか及詳細情報
     """
-    # 检查是否至少あり一个テーブル
+    # 少なくとも1つのテーブルがあるか確認
     if not get_editor_tables():
-        return False, "至少需要一个テーブル"
+        return False, "少なくとも1つのテーブルが必要です"
 
-    # 检查是否至少あり一个キッチン
+    # 少なくとも1つのキッチンがあるか確認
     if not get_editor_kitchen():
-        return False, "至少需要一个キッチン"
+        return False, "少なくとも1つのキッチンが必要です"
 
-    # 检查是否あり駐車スポット
+    # 少なくとも1つの駐車スポットがあるか確認
     if not get_editor_parking():
-        return False, "需要一个駐車スポット"
+        return False, "少なくとも1つの駐車スポットが必要です"
         
-    # 检查レイアウト名
-    if not get_editor_layout_name() or get_editor_layout_name() == "新布局":
-        return False, "请提供あり效的レイアウト名"
+    # レイアウト名を確認
+    if not get_editor_layout_name() or get_editor_layout_name() == "新レイアウト":
+        return False, "有効なレイアウト名を提供してください"
 
-    return True, "布局あり效"
+    return True, "レイアウトが有効です"
 
 
 def get_cell_description(row, col):
@@ -1405,11 +1397,11 @@ def get_cell_description(row, col):
         return ""
 
     cell_type = grid[row][col]
-    descriptions = {0: "空地", 1: "墙壁/障碍", 2: "テーブル", 3: "キッチン", 4: "駐車スポット"}
+    descriptions = {0: "空地", 1: "壁/障害物", 2: "テーブル", 3: "キッチン", 4: "駐車スポット"}
 
     base_desc = f"({row}, {col}): {descriptions.get(cell_type, '未知')}"
 
-    # 添加额外信息
+    # 追加情報を追加
     if cell_type == 2:  # テーブル
         for tid, pos in get_editor_tables().items():
             if pos == (row, col):
@@ -1420,48 +1412,48 @@ def get_cell_description(row, col):
 
 def render_plotly_restaurant_layout_no_cache(_restaurant, path=None, title="レストランレイアウト"):
     """
-    なし缓存版本的レストランレイアウト渲染函数，确保每次都重新渲染最新的布局。
+    なしキャッシュのレストランレイアウトレンダリング関数，最新のレイアウトを確実に再レンダリングする。
     
-    参数:
-    - _restaurant: Restaurant，餐厅实例
-    - path: List[Tuple[int, int]]，可选，机器人路径
-    - title: str，标题
+    パラメータ:
+    - _restaurant: Restaurant，レストランインスタンス
+    - path: List[Tuple[int, int]]，オプション，ロボットの経路
+    - title: str，タイトル
     """
     layout = _restaurant.layout
     grid = layout.grid
     height = layout.height
     width = layout.width
 
-    # 创建颜色映射
+    # 色のマッピング
     colormap = {
         0: "white",  # 空地
-        1: "#333333",  # 墙壁/障碍
+        1: "#333333",  # 壁/障害物
         2: "#00cc66",  # テーブル
         3: "#f5c518",  # キッチン
         4: "#4da6ff",  # 駐車スポット
     }
 
-    # 创建标签映射
+    # ラベルのマッピング
     labels = [["" for _ in range(width)] for _ in range(height)]
 
-    # 设置テーブル标签
+    # テーブルのラベル
     for table_id, pos in layout.tables.items():
         row, col = pos
         labels[row][col] = table_id
 
-    # 设置キッチン标签
+    # キッチンのラベル
     for row, col in layout.kitchen:
         labels[row][col] = "厨"
 
-    # 设置駐車スポット标签
+    # 駐車スポットのラベル
     if layout.parking:
         row, col = layout.parking
         labels[row][col] = "停"
 
-    # 创建热力图数据
+    # 図表を作成
     fig = go.Figure()
 
-    # 添加热力图 - 显示颜色块
+    # 図表のデータ
     heatmap_z = np.array(grid)
     colorscale = [
         [0, colormap[0]],
@@ -1485,7 +1477,7 @@ def render_plotly_restaurant_layout_no_cache(_restaurant, path=None, title="レ�
         )
     )
 
-    # 添加文本注釋 - 显示标签
+    # テキスト注釈 - 表示ラベル
     for i in range(height):
         for j in range(width):
             if labels[i][j]:
@@ -1497,9 +1489,9 @@ def render_plotly_restaurant_layout_no_cache(_restaurant, path=None, title="レ�
                     font=dict(size=14, color="black", family="Arial Black"),
                 )
 
-    # 添加路径点（如果あり）
+    # パス点（もし存在する場合）
     if path:
-        path_y, path_x = zip(*path)  # 注意Plotly的坐标系
+        path_y, path_x = zip(*path)  # 注意Plotlyの座標系
         fig.add_trace(
             go.Scatter(
                 x=path_x,
@@ -1511,10 +1503,10 @@ def render_plotly_restaurant_layout_no_cache(_restaurant, path=None, title="レ�
             )
         )
 
-    # 设置图表布局
+    # 図表のレイアウトを設定
     fig.update_layout(
         title=dict(text=title, font=dict(size=20)),
-        width=width * 50,  # 根据网格大小调整图表大小
+        width=width * 50,  # グリッドサイズに応じて図表サイズを調整
         height=height * 50,
         margin=dict(l=0, r=0, t=40, b=0),
         plot_bgcolor="rgba(0,0,0,0)",
@@ -1534,18 +1526,16 @@ def render_plotly_restaurant_layout_no_cache(_restaurant, path=None, title="レ�
             showticklabels=False,
             scaleanchor="x",
             scaleratio=1,
-            range=[height - 0.5, -0.5],  # 反转Y轴使(0,0)在左上角
+            range=[height - 0.5, -0.5],
         ),
-        # 添加国际象棋棋盘样式的背景网格
+        # 国際象棋盤の背景グリッド
         shapes=[
-            # 水平线
             *[dict(
                 type="line",
                 x0=-0.5, x1=width-0.5,
                 y0=i-0.5, y1=i-0.5,
                 line=dict(color="lightgrey", width=1)
             ) for i in range(height+1)],
-            # 垂直线
             *[dict(
                 type="line",
                 x0=j-0.5, x1=j-0.5,

@@ -1,5 +1,5 @@
 """
-工具函数
+ユーティリティ関数
 """
 import os
 import json
@@ -20,9 +20,9 @@ from .constants import LAYOUT_DIR, RAG_KB_DIR, EMPTY_STYLE, WALL_STYLE, TABLE_ST
 
 def available_layouts(layout_dir=LAYOUT_DIR):
     """
-    获取可用的レストランレイアウト列表
+    利用可能なレストランレイアウトのリストを取得する
     """
-    # 检查是否存在新式布局文件
+    # 新しい形式のレイアウトファイルが存在するかチェック
     new_format_path = os.path.join(layout_dir, "layouts.json")
     if os.path.exists(new_format_path):
         try:
@@ -30,34 +30,34 @@ def available_layouts(layout_dir=LAYOUT_DIR):
                 layouts_data = json.load(f)
                 return [layout["name"] for layout in layouts_data["layouts"]]
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"加载新式布局文件失败: {e}")
+            print(f"新しい形式のレイアウトファイルの読み込みに失敗しました: {e}")
             return []
     
-    # 回退到旧式布局文件
+    # 古い形式のレイアウトファイルにフォールバック
     if os.path.exists(layout_dir):
         return sorted(os.path.splitext(f)[0] for f in os.listdir(layout_dir) if f.endswith(".json") and f != "layouts.json")
     return []
 
 def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
     """
-    从字符串数组解析レストランレイアウト
+    文字列配列からレストランレイアウトを解析する
     
     Args:
-        layout_name: 布局名称
-        layout_lines: 布局字符串数组
+        layout_name: レイアウト名
+        layout_lines: レイアウト文字列配列
         
     Returns:
-        dict: 包含解析后的布局配置
+        dict: 解析されたレイアウト設定を含む
     """
-    # 字符到数值的映射
+    # 文字から数値へのマッピング
     char_map = {
-        "#": 1, "＃": 1, "W": 1,    # 墙壁/障碍
-        "*": 0, ".": 0,             # 空地
-        "台": 3,                    # 厨房
-        "停": 4, "P": 4             # 停靠点
+        "#": 1, "＃": 1, "W": 1,    # 壁/障害物
+        "*": 0, ".": 0,             # 空き地
+        "台": 3,                    # キッチン
+        "停": 4, "P": 4             # 駐車位置
     }
     
-    # 初始化数据结构
+    # データ構造の初期化
     height = len(layout_lines)
     width = max(len(line.split()) for line in layout_lines) if height else 0
     grid = [[0] * width for _ in range(height)]
@@ -65,26 +65,26 @@ def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
     kitchen_positions = []
     parking_position = None
     
-    # 解析布局字符串
+    # レイアウト文字列の解析
     for row, line in enumerate(layout_lines):
         tokens = line.split()
         for col, token in enumerate(tokens):
             if token in char_map:
-                # 已知符号
+                # 既知の記号
                 value = char_map[token]
                 grid[row][col] = value
                 
-                # 特殊位置记录
-                if value == 3:  # 厨房
+                # 特殊位置の記録
+                if value == 3:  # キッチン
                     kitchen_positions.append((row, col))
-                elif value == 4:  # 停靠点
+                elif value == 4:  # 駐車位置
                     parking_position = (row, col)
             elif token.isalpha() and len(token) == 1:
-                # 桌子
+                # テーブル
                 grid[row][col] = 2
                 table_positions[token] = (row, col)
             else:
-                # 未知符号，当作空地处理
+                # 未知の記号、空き地として処理
                 grid[row][col] = 0
     
     return {
@@ -96,46 +96,46 @@ def parse_layout_from_strings(layout_name: str, layout_lines: List[str]):
 
 def display_restaurant_ascii(restaurant, restaurant_name=None):
     """
-    显示ASCII格式的レストランレイアウト
+    ASCII形式でレストランレイアウトを表示する
     
     Args:
-        restaurant: 餐厅对象或レストランレイアウト对象
-        restaurant_name: 餐厅名称（可选）
+        restaurant: レストランオブジェクトまたはレストランレイアウトオブジェクト
+        restaurant_name: レストラン名（オプション）
     """
     layout = getattr(restaurant, 'layout', restaurant)
     name = restaurant_name or getattr(restaurant, 'name', 'Restaurant')
     
-    # 符号映射（根据数字编码）
+    # 記号マッピング（数字コードに基づく）
     symbols = {
-        0: ".",    # 空地
-        1: "#",    # 墙/障碍
-        2: "?",    # 桌子（将被替换为桌号）
-        3: "?",    # 厨房
-        4: "P",    # 停靠点
-        100: "K",  # 厨房（新格式）
-        200: "P",  # 停靠点（新格式）
+        0: ".",    # 空き地
+        1: "#",    # 壁/障害物
+        2: "?",    # テーブル（テーブル番号に置き換えられる）
+        3: "?",    # キッチン
+        4: "P",    # 駐車位置
+        100: "K",  # キッチン（新形式）
+        200: "P",  # 駐車位置（新形式）
     }
     
-    # 打印标题
+    # タイトルの表示
     print(f"レストランレイアウト: {name} ({layout.width}x{layout.height})")
     print("-" * (layout.width * 2 + 3))
     
-    # 反向查找表格ID
+    # テーブルIDの逆引き
     rev_tables = {pos: tid for tid, pos in layout.tables.items()}
     
-    # 打印布局
+    # レイアウトの表示
     for i in range(layout.height):
         print("|", end=" ")
         for j in range(layout.width):
             cell_value = layout.grid[i][j]
             if cell_value == 2 and (i, j) in rev_tables:
-                # 显示桌子ID
+                # テーブルIDを表示
                 print(rev_tables[(i, j)], end=" ")
             elif 2 <= cell_value <= 99:
-                # 数字表示的桌子ID（尝试从rev_tables获取，否则显示?）
+                # 数字で表されるテーブルID（rev_tablesから取得、なければ?を表示）
                 print(rev_tables.get((i, j), "?"), end=" ")
             else:
-                # 其他类型单元格
+                # その他のタイプのセル
                 print(symbols.get(cell_value, "?"), end=" ")
         print("|")
     
@@ -143,11 +143,11 @@ def display_restaurant_ascii(restaurant, restaurant_name=None):
 
 def load_restaurant(layout_name, layout_dir=LAYOUT_DIR):
     """
-    加载レストランレイアウト
+    レストランレイアウトを読み込む
     """
     new_format_path = os.path.join(layout_dir, "layouts.json")
     if not os.path.exists(new_format_path):
-        raise FileNotFoundError(f"找不到布局文件: {new_format_path}")
+        raise FileNotFoundError(f"レイアウトファイルが見つかりません: {new_format_path}")
 
     with open(new_format_path, encoding="utf-8") as f:
         layouts_data = json.load(f)
@@ -158,45 +158,45 @@ def load_restaurant(layout_name, layout_dir=LAYOUT_DIR):
             )
             return Restaurant(layout_name, RestaurantLayout(**cfg))
 
-    raise KeyError(f"在 layouts.json 中未找到名为 {layout_name} 的布局")
+    raise KeyError(f"layouts.jsonに名前が{layout_name}のレイアウトが見つかりません")
 
 def save_restaurant_layout(layout_data, layout_dir=LAYOUT_DIR):
     """
-    保存レストランレイアウト到JSON文件
+    レストランレイアウトをJSONファイルに保存する
     
     Args:
-        layout_data: dict, 包含布局数据
-        layout_dir: 保存目录路径
+        layout_data: dict, レイアウトデータを含む
+        layout_dir: 保存ディレクトリのパス
     
     Returns:
-        str: 保存文件的路径
+        str: 保存したファイルのパス
     """
-    # 确保目录存在
+    # ディレクトリが存在することを確認
     os.makedirs(layout_dir, exist_ok=True)
     
-    # 准备数据
-    name = layout_data.get("name", "新布局")
+    # データの準備
+    name = layout_data.get("name", "新しいレイアウト")
     grid = layout_data.get("grid", [])
     
-    # 检查是否存在layouts.json文件
+    # layouts.jsonファイルが存在するかチェック
     layouts_path = os.path.join(layout_dir, "layouts.json")
     if os.path.exists(layouts_path):
-        # 加载现有布局
+        # 既存のレイアウトを読み込む
         try:
             with open(layouts_path, "r", encoding="utf-8") as f:
                 layouts_data = json.load(f)
                 layouts = layouts_data.get("layouts", [])
         except Exception:
-            # 如果读取出错，创建新的布局列表
+            # 読み込みエラーの場合、新しいレイアウトリストを作成
             layouts = []
     else:
         layouts = []
     
-    # 查找是否已存在同名布局
+    # 同名のレイアウトが既に存在するか確認
     layout_found = False
     for i, layout in enumerate(layouts):
         if layout.get("name") == name:
-            # 更新现有布局
+            # 既存のレイアウトを更新
             layouts[i] = {
                 "name": name,
                 "grid": grid
@@ -204,14 +204,14 @@ def save_restaurant_layout(layout_data, layout_dir=LAYOUT_DIR):
             layout_found = True
             break
     
-    # 如果没有找到布局，添加新的
+    # レイアウトが見つからなければ、新しく追加
     if not layout_found:
         layouts.append({
             "name": name,
             "grid": grid
         })
     
-    # 保存到layouts.json
+    # layouts.jsonに保存
     with open(layouts_path, "w", encoding="utf-8") as f:
         json.dump({"layouts": layouts}, f, ensure_ascii=False, indent=2)
     
@@ -219,24 +219,24 @@ def save_restaurant_layout(layout_data, layout_dir=LAYOUT_DIR):
 
 def save_layouts_to_single_file(layouts: List[Dict[str, Any]], layout_dir=LAYOUT_DIR):
     """
-    将多个レストランレイアウト保存到单一的layouts.json文件
+    複数のレストランレイアウトを単一のlayouts.jsonファイルに保存する
     
     Args:
-        layouts: 布局数据列表，每个元素包含name和grid
-        layout_dir: 保存目录路径
+        layouts: レイアウトデータのリスト、各要素はnameとgridを含む
+        layout_dir: 保存ディレクトリのパス
     
     Returns:
-        str: 保存文件的路径
+        str: 保存したファイルのパス
     """
-    # 确保目录存在
+    # ディレクトリが存在することを確認
     os.makedirs(layout_dir, exist_ok=True)
     
-    # 准备保存的数据
+    # 保存するデータの準備
     save_data = {
         "layouts": layouts
     }
     
-    # 保存到文件
+    # ファイルに保存
     file_path = os.path.join(layout_dir, "layouts.json")
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(save_data, f, ensure_ascii=False, indent=2)
@@ -245,61 +245,61 @@ def save_layouts_to_single_file(layouts: List[Dict[str, Any]], layout_dir=LAYOUT
 
 def delete_restaurant_layout(layout_name, layout_dir=LAYOUT_DIR):
     """
-    删除レストランレイアウト文件
+    レストランレイアウトファイルを削除する
     
     Args:
-        layout_name: 布局名称
-        layout_dir: 布局文件目录
+        layout_name: レイアウト名
+        layout_dir: レイアウトファイルのディレクトリ
     
     Returns:
-        bool: 是否成功删除
+        bool: 削除に成功したかどうか
     """
-    # 检查新格式文件
+    # 新形式ファイルをチェック
     new_format_path = os.path.join(layout_dir, "layouts.json")
     if os.path.exists(new_format_path):
         try:
             with open(new_format_path, "r", encoding="utf-8") as f:
                 layouts_data = json.load(f)
                 
-            # 过滤掉要删除的布局
+            # 削除するレイアウトをフィルタリング
             layouts_data["layouts"] = [
                 layout for layout in layouts_data["layouts"]
                 if layout["name"] != layout_name
             ]
             
-            # 保存回文件
+            # ファイルに書き戻す
             with open(new_format_path, "w", encoding="utf-8") as f:
                 json.dump(layouts_data, f, ensure_ascii=False, indent=2)
             
             return True
         except Exception as e:
-            print(f"从新格式文件删除布局失败: {e}")
+            print(f"新形式ファイルからレイアウトの削除に失敗しました: {e}")
             return False
     
-    # 回退到旧格式
+    # 古い形式にフォールバック
     file_path = os.path.join(layout_dir, f"{layout_name}.json")
     if os.path.exists(file_path):
         os.remove(file_path)
         return True
     return False
 
-def build_robot(use_ai, layout, restaurant_name="默认餐厅"):
+def build_robot(use_ai, layout, restaurant_name="デフォルトレストラン"):
     """
-    构建机器人实例
+    ロボットインスタンスを構築する
     """
     if use_ai:
         robot = AIEnhancedRobot(layout, robot_id=1, knowledge_dir=RAG_KB_DIR, restaurant_name=restaurant_name)
     else:
         robot = Robot(layout, robot_id=1, restaurant_name=restaurant_name)
         
-    # 设置机器人的目标容忍参数
-    robot.GOAL_TOLERANCE = 0  # 必须到达确切位置才算送达
+    # ロボットの目標許容パラメータを設定
+    robot.GOAL_TOLERANCE = 0  # 正確な位置に到達する必要がある
     
     return robot
 
 def make_order(seq, table_id):
     """
-    创建订单实例
+    注文インスタンスを作成する
     """
     return Order(order_id=seq, table_id=table_id, prep_time=0)
 
@@ -307,26 +307,26 @@ def create_rich_layout(grid, height, width, tables,
                        robot_position: Optional[Tuple[int, int]] = None,
                        highlight_path: Optional[list] = None):
     """
-    创建富文本格式的レストランレイアウト
+    リッチテキスト形式のレストランレイアウトを作成する
     
     Args:
-        grid: 餐厅网格数据
-        height: 网格高度
-        width: 网格宽度
-        tables: 桌子位置字典
-        robot_position: 机器人当前位置（可选）
-        highlight_path: 需要高亮显示的路径点列表（可选）
+        grid: レストラングリッドデータ
+        height: グリッドの高さ
+        width: グリッドの幅
+        tables: テーブル位置の辞書
+        robot_position: ロボットの現在位置（オプション）
+        highlight_path: ハイライト表示するパスポイントのリスト（オプション）
     """
-    # 存储高亮点的集合
+    # ハイライトポイントのセットを保存
     highlight_points = set(highlight_path or [])
     
-    # 定义各种元素的样式
+    # 各要素のスタイルを定義
     cell_chars = {
-        0: "  ",              # 空地
-        1: "██",              # 墙/障碍
-        2: None,              # 桌子 (特殊处理)
-        3: "厨",              # 厨房
-        4: "停",              # 停靠点
+        0: "  ",              # 空き地
+        1: "██",              # 壁/障害物
+        2: None,              # テーブル (特別処理)
+        3: "厨",              # キッチン
+        4: "停",              # 駐車位置
     }
     
     cell_styles = {
@@ -344,59 +344,59 @@ def create_rich_layout(grid, height, width, tables,
             cell_type = grid[x][y]
             pos = (x, y)
             
-            # 检查是否需要突出显示当前点
+            # 現在のポイントをハイライト表示する必要があるかチェック
             is_robot_pos = robot_position and pos == robot_position
             is_highlight = pos in highlight_points
             
-            # 获取单元格文本
-            if cell_type == 2:  # 桌子特殊处理
+            # セルテキストを取得
+            if cell_type == 2:  # テーブルの特別処理
                 cell_text = get_table_id(pos, tables)
             else:
                 cell_text = cell_chars.get(cell_type, "??")
             
-            # 获取样式
+            # スタイルを取得
             style = cell_styles.get(cell_type, ERROR_STYLE)
             
-            # 处理高亮情况
+            # ハイライト状況を処理
             if is_robot_pos:
-                # 机器人位置使用特殊符号和红色背景
+                # ロボット位置には特別な記号と赤い背景を使用
                 text_segment = Text("🤖", style=Style(bgcolor="red", color="white", bold=True))
             elif is_highlight:
-                # 路径点使用特殊背景色
+                # パスポイントには特別な背景色を使用
                 text_segment = Text(cell_text, style=Style(bgcolor="magenta", color="white"))
             else:
-                # 普通单元格
+                # 通常のセル
                 text_segment = Text(cell_text, style=style)
                 
             layout_text.append(text_segment)
             
-        # 行结束，添加换行符
+        # 行の終わりに改行を追加
         layout_text.append("\n")
         
     return layout_text
 
 def get_table_id(pos, tables):
     """
-    获取特定位置对应的桌子ID
+    特定の位置に対応するテーブルIDを取得する
     """
-    # 通过位置反查桌子ID
+    # 位置からテーブルIDを逆引き
     for tid, tpos in tables.items():
         if tpos == pos:
             return tid.center(2)
-    return "桌"
+    return "テ"
 
 def create_rich_restaurant_panel(restaurant, 
                                 robot_position=None, 
                                 highlight_path=None,
                                 title_suffix=""):
     """
-    创建富文本格式的レストランレイアウト面板
+    リッチテキスト形式のレストランレイアウトパネルを作成する
     
     Args:
-        restaurant: 餐厅对象
-        robot_position: 机器人当前位置（可选）
-        highlight_path: 需要高亮显示的路径（可选）
-        title_suffix: 标题后缀（可选）
+        restaurant: レストランオブジェクト
+        robot_position: ロボットの現在位置（オプション）
+        highlight_path: ハイライト表示するパス（オプション）
+        title_suffix: タイトルの接尾辞（オプション）
     """
     layout = restaurant.layout
     
