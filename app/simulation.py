@@ -3,7 +3,6 @@
 """
 
 import random
-import time
 from .utils import build_robot, make_order
 from .constants import logger
 from .state import get_next_batch_id
@@ -54,9 +53,6 @@ class SimulationEngine:
         }
         self.path_histories = []
         self.assigned_orders = []
-
-        # 性能优化：批处理订单，减少UI更新频率
-        start_time = time.time()
         
         # 创建一个机器人实例
         bot = build_robot(self.use_ai, self.restaurant.layout, restaurant_name=self.restaurant.name)

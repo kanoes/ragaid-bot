@@ -5,7 +5,6 @@ Streamlit Web App 主页面逻辑
 import gc
 import streamlit as st
 import pandas as pd
-import time
 from .constants import logger
 from .utils import available_layouts
 from .ui import (
@@ -15,7 +14,6 @@ from .ui import (
     render_layout_editor,
     render_plotly_stats,
     render_plotly_robot_path,
-    render_plotly_stats_extended,
     render_rag_test,
 )
 from .handlers import (

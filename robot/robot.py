@@ -13,12 +13,9 @@ from __future__ import annotations
 
 import logging
 import os
-import math
 from typing import List, Optional, Tuple, Deque
 from collections import deque
-import numpy as np
 import time
-import random
 
 from restaurant.restaurant_layout import RestaurantLayout
 from robot.motion_controller import MotionController
@@ -138,9 +135,6 @@ class Robot:
         
         # 添加到当前批次
         self.current_batch_orders.append(order)
-        
-        # 计算订单等待时间 (从创建到开始配送)
-        waiting_time = time.time() - order.created_time
         
         # 获取桌子对应的送餐点
         delivery_pos = self.layout.get_delivery_point(order.table_id)

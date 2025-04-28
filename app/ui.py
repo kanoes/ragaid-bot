@@ -8,7 +8,6 @@ import numpy as np
 from rich.text import Text
 from streamlit_plotly_events import plotly_events
 import pandas as pd
-import time
 import os
 
 from .state import (
@@ -294,16 +293,6 @@ def render_stats(stats):
     显示基本统计信息
     """
     st.subheader("本次模拟数据")
-    
-    # 显示指标 - 删除了total_steps
-    metrics = {
-        "total_orders": "总订单数",
-        "total_time": "总配送时间",
-        "avg_waiting_time": "平均订单等待时间",
-        "总配送路程": "总配送路程",
-        "餐厅布局": "餐厅布局",
-        "机器人类型": "机器人类型",
-    }
     
     if stats:
         # 添加餐厅布局名称
@@ -1277,7 +1266,6 @@ def render_interactive_editor_grid():
     for i in range(height):
         row_texts = []
         for j in range(width):
-            cell_type = grid[i][j]
             cell_desc = get_cell_description(i, j)
             row_texts.append(cell_desc)
         hover_texts.append(row_texts)
