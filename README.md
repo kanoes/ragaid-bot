@@ -4,21 +4,23 @@
 
 ---
 
-## 一、実験内容
+## 実験
 
-1. **基本実験（通常のロボットの経路探索方法）**
-   - ロボットが注文を受ける
-   - ロボットが経路を計画する
-   - ロボットが行動する
-   - レストランの作成
-2. **RAG（Retrieval-Augmented Generation）の構築**：
-   - 知識ベースの作成（ベクトルデータベース）
-   - リトリーバー
-   - LLMリクエスト
-3. **RAG（Retrieval-Augmented Generation）ロボットの構築**：
-   - RAGを通常のロボットに接続する
+### 実験内容
 
-## 二、実験データ
+- **基本実験（通常のロボットの経路探索方法）**
+  - ロボットが注文を受ける
+  - ロボットが経路を計画する
+  - ロボットが行動する
+  - レストランの作成
+- **RAG（Retrieval-Augmented Generation）の構築**
+  - 知識ベースの作成（ベクトルデータベース）
+  - リトリーバー
+  - LLMリクエスト
+- **RAG（Retrieval-Augmented Generation）ロボットの構築**
+  - RAGを通常のロボットに接続する
+
+### 実験データ
 
 - **現在のデータ**：
   - 配送総時間、配送総距離、注文平均待ち時間
@@ -29,58 +31,87 @@
 
 ---
 
-## ディレクトリ構造
+## 環境構築&起動
 
-```text
-ragaid-bot/
-├─ app/                       # Streamlit Webアプリケーション
-│  ├─ constants.py            # 定数定義
-│  ├─ handlers.py             # UIイベント処理
-│  ├─ main.py                 # アプリケーションのメインロジック
-│  ├─ simulation.py           # シミュレーションエンジン
-│  ├─ state.py                # 状態管理
-│  ├─ ui.py                   # UIコンポーネント
-│  ├─ utils.py                # ユーティリティ関数
-│  └─ __init__.py
-├─ restaurant/                # レストラングリッド & 事前設定レイアウトファイル
-│  ├─ restaurant_layout.py    # レイアウト解析とAPI
-│  ├─ restaurant.py           # `Restaurant`クラス
-│  ├─ layouts.json            # 複数の事前設定レイアウト例
-│  └─ README.md               # サブパッケージの説明
-├─ robot/                     # ロボットのコアロジック
-│  ├─ robot.py                # `Robot` & `AIEnhancedRobot`
-│  ├─ motion_controller.py    # 実行レイヤー
-│  ├─ planner.py              # 経路計画と注文管理
-│  ├─ rag/                    # RAGサブパッケージ
-│  │  ├─ knowledge            # デフォルト知識ベース
-│  │  │  └─ restaurant_rule.json
-│  │  ├─ llm_client.py        # LLMインターフェースラッパー
-│  │  ├─ knowledge_base.py    # 知識ベースのロードとインデックス作成
-│  │  ├─ retriever.py         # ベクトル検索
-│  │  ├─ prompt_helper.py     # プロンプト構築と簡略化
-│  │  ├─ rag_module.py        # 意思決定インターフェース
-│  │  └─ README.md            # サブパッケージの説明
-│  └─ __init__.py
-├─ app.py                     # Streamlitエントリーポイント
-├─ Dockerfile
-├─ docker-compose.yml
-├─ requirements.txt           # 依存リスト
-├─ memo.md                    # 開発メモ
-├─ .gitignore
+### venv
+
+#### Windows環境
+
+- 仮想環境の作成と有効化
+
+```bash
+venv\Scripts\activate
+```
+
+- 依存関係のインストール
+
+```bash
+pip install -r requirements.txt
+```
+
+- envファイルの作成（OpenAI APIキーなどが必要な場合）
+
+```bash
+echo OPENAI_API_KEY=your_api_key > .env
+```
+
+- アプリケーションの実行
+
+```bash
+streamlit run app.py
+```
+
+#### MacOS環境
+
+- リポジトリをクローン
+
+```bash
+git clone https://github.com/yourusername/ragaid-bot.git
+cd ragaid-bot
+```
+
+- 仮想環境の作成と有効化
+
+```bash
+source venv/bin/activate
+```
+
+- 依存関係のインストール
+
+```bash
+pip install -r requirements.txt
+```
+
+- envファイルの作成（OpenAI APIキーなどが必要な場合）
+
+```bash
+echo "OPENAI_API_KEY=your_api_key" > .env
+```
+
+- アプリケーションの実行
+
+```bash
+streamlit run app.py
 ```
 
 ---
 
-## クイックスタート
+### Docker
 
-- Dockerをインストールして起動:
+- envファイルを作成
+
+- Docker Desktopを起動
+
+- ターミナルで以下のコマンドを実行
 
 ```bash
 docker compose up --build
 ```
 
-- アクセス先：[http://localhost:8501]
+- ブラウザで以下のURLにアクセス：[http://localhost:8501]
+
+---
 
 ## 将来の改善点
 
-- なし
+なし
