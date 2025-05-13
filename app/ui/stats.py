@@ -1,5 +1,5 @@
 """
-统计数据可视化组件
+統計データの可視化コンポーネント
 """
 
 import streamlit as st
@@ -12,19 +12,19 @@ from ..state import get_batch_histories
 
 def render_stats(stats):
     """
-    显示基本统计信息
+    基本統計情報を表示
     """
     st.subheader("今回のシミュレーションデータ")
     
     if stats:
-        # 添加餐厅布局名
+        # レストランレイアウト名を追加
         if "配送履歴" in stats and stats["配送履歴"] and "レストランレイアウト" in stats["配送履歴"][0]:
             stats["レストランレイアウト"] = stats["配送履歴"][0]["レストランレイアウト"]
             
-        # 使用更紧凑的布局
+        # よりコンパクトなレイアウトを使用
         col1, col2 = st.columns(2)
         
-        # 左半部分
+        # 左半分
         with col1:
             if "total_orders" in stats:
                 st.write(f"**総注文数:** {stats['total_orders']}")
@@ -33,7 +33,7 @@ def render_stats(stats):
             if "avg_waiting_time" in stats:
                 st.write(f"**平均注文待ち時間:** {stats['avg_waiting_time']:.2f}")
                 
-        # 右半部分
+        # 右半分
         with col2:
             if "総配送路程" in stats:
                 st.write(f"**総配達距離:** {stats['総配送路程']}")
@@ -49,12 +49,12 @@ def render_stats(stats):
 @st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
 def render_plotly_stats(stats):
     """
-    使用Plotly渲染统计数据图表
+    Plotlyを使用して統計データをグラフ化
     """
     if not stats:
         return
         
-    # 准备基本统计数据
+    # 基本統計データを準備
     key_metrics = {
         "総注文数": stats.get("total_orders", 0),
         "総配達距離": stats.get("総配送路程", 0),
@@ -62,10 +62,10 @@ def render_plotly_stats(stats):
         "平均注文待ち時間": stats.get("avg_waiting_time", 0)
     }
     
-    # 创建柱状图
+    # 棒グラフを作成
     fig = go.Figure()
     
-    # 添加柱子
+    # 棒を追加
     fig.add_trace(
         go.Bar(
             x=list(key_metrics.keys()),
@@ -76,7 +76,7 @@ def render_plotly_stats(stats):
         )
     )
     
-    # 设置布局
+    # レイアウトを設定
     fig.update_layout(
         title="コアパフォーマンス指標",
         xaxis_title="指標",
@@ -85,15 +85,15 @@ def render_plotly_stats(stats):
         margin=dict(l=40, r=40, t=40, b=40)
     )
     
-    # 显示图表
+    # グラフを表示
     st.plotly_chart(fig, use_container_width=True)
 
 
 def format_value(key, value, metrics):
     """
-    格式化值显示
+    値の表示をフォーマット
     """
-    # 简单处理，不依赖metrics的格式化工具
+    # metricsに依存しない単純な処理
     if isinstance(value, float):
         return f"{value:.1f}"
     return str(value)
@@ -102,38 +102,38 @@ def format_value(key, value, metrics):
 @st.cache_data(ttl=300, show_spinner=False, hash_funcs={object: lambda x: id(x)}) if ENABLE_CACHING else lambda f: f
 def render_plotly_stats_extended(stats_data, custom_metrics=None):
     """
-    渲染扩展统计数据的可视化，支持自定义指标
+    拡張統計データの可視化をレンダリングし、カスタム指標をサポート
 
-    参数:
-    - stats_data: dict，统计数据字典
-    - custom_metrics: dict，自定义指标设置，格式: {'指标名': {'color': 颜色, 'format': 格式化函数}}
+    パラメータ:
+    - stats_data: dict、統計データの辞書
+    - custom_metrics: dict、カスタム指標設定、形式: {'指標名': {'color': 色, 'format': フォーマット関数}}
     """
     if not stats_data:
         return
         
-    # 获取累积的批次历史数据
+    # 累積バッチ履歴データを取得
     batch_histories = get_batch_histories()
 
-    st.header("高级统计分析")
+    st.header("高度統計分析")
 
-    # 默认指标设置
+    # デフォルト指標設定
     default_metrics = {
         "total_orders": {"color": "#00cc66", "format": lambda x: int(x)},
         "total_batches": {"color": "#ff9900", "format": lambda x: int(x)},
-        "総配送路程": {"color": "#4da6ff", "format": lambda x: int(x)},
+        "總配送路程": {"color": "#4da6ff", "format": lambda x: int(x)},
         "平均每批次订单数": {"color": "#f5c518", "format": lambda x: f"{x:.2f}"},
         "平均每订单步数": {"color": "#2196f3", "format": lambda x: f"{x:.2f}"}
     }
 
-    # 整合自定义指标
+    # カスタム指標を統合
     metrics = default_metrics.copy()
     if custom_metrics:
         metrics.update(custom_metrics)
 
-    # 准备数据
+    # データを準備
     data = []
 
-    # 基本统计
+    # 基本統計
     data.append(
         {
             "指標": "総注文数",
@@ -143,42 +143,42 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
     )
     data.append(
         {
-            "指標": "総批次数",
+            "指標": "総バッチ数",
             "値": stats_data.get("total_batches", 0),
             "色": metrics.get("total_batches", {}).get("color", "#ff9900"),
         }
     )
     
-    # 添加配送路程指标
+    # 配達距離指標を追加
     data.append(
         {
-            "指標": "総配送路程",
+            "指標": "総配達距離",
             "値": stats_data.get("総配送路程", 0),
             "色": metrics.get("總配送路程", {}).get("color", "#4da6ff"),
         }
     )
 
-    # 添加平均值指标
-    for key in ["平均每批次订单数", "平均每订单步数", "平均每订单配送时间"]:
+    # 平均値指標を追加
+    for key in ["バッチあたりの平均注文数", "注文あたりの平均ステップ数", "注文あたりの平均配達時間"]:
         if key in stats_data:
             metric_config = metrics.get(
                 key, {"color": "#9467bd", "format": lambda x: f"{x:.2f}"}
             )
             data.append({"指標": key, "値": stats_data[key], "色": metric_config["color"]})
 
-    # 添加其他统计指标
+    # 他の統計指標を追加
     for key, value in stats_data.items():
-        if key not in ["total_orders", "total_batches", "総配送路程", "平均每批次订单数", "平均每订单步数", "平均每订单配送时间", "配送履歴"]:
+        if key not in ["total_orders", "total_batches", "總配送路程", "バッチあたりの平均注文数", "注文あたりの平均ステップ数", "注文あたりの平均配達時間", "配送履歴"]:
             metric_config = metrics.get(
                 key, {"color": "#9467bd", "format": lambda x: x}
             )
             data.append({"指標": key, "値": value, "色": metric_config["color"]})
 
-    # 创建图表
+    # チャートを作成
     tabs = st.tabs(["配送性能", "レーダーチャート", "履歴バッチ分析"])
 
     with tabs[0]:
-        # 柱状图
+        # 棒グラフ
         fig_bar = go.Figure()
         fig_bar.add_trace(
             go.Bar(
@@ -200,7 +200,7 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
         st.plotly_chart(fig_bar, use_container_width=True)
 
     with tabs[1]:
-        # 雷达图
+        # レーダーチャート
         fig_radar = go.Figure()
 
         fig_radar.add_trace(
@@ -227,12 +227,12 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
         st.plotly_chart(fig_radar, use_container_width=True)
 
     with tabs[2]:
-        # 批次历史分析
+        # バッチ履歴分析
         if batch_histories:
-            # 将历史数据转换为DataFrame进行分析
+            # 履歴データをDataFrameに変換して分析
             history_df = pd.DataFrame(batch_histories)
             
-            # 批次订单数分布
+            # バッチ注文数分布
             if "orders_count" in history_df.columns:
                 st.subheader("バッチ注文数分布")
                 fig_batch = go.Figure()
@@ -253,9 +253,9 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                 )
                 st.plotly_chart(fig_batch, use_container_width=True)
             
-            # 批次配送路程分布
+            # バッチ配送距離分布
             if "path_length" in history_df.columns:
-                st.subheader("バッチ配送路程分布")
+                st.subheader("バッチ配送距離分布")
                 fig_path = go.Figure()
                 fig_path.add_trace(
                     go.Bar(
@@ -267,16 +267,16 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_path.update_layout(
-                    title="各バッチ配送路程",
+                    title="各バッチ配送距離",
                     xaxis=dict(title="バッチ"),
-                    yaxis=dict(title="配送路程"),
+                    yaxis=dict(title="配送距離"),
                     height=300,
                 )
                 st.plotly_chart(fig_path, use_container_width=True)
                 
-            # 批次配送时间分布
+            # バッチ配送時間分布
             if "duration" in history_df.columns:
-                st.subheader("バッチ配送时间分布")
+                st.subheader("バッチ配送時間分布")
                 fig_duration = go.Figure()
                 fig_duration.add_trace(
                     go.Bar(
@@ -288,17 +288,17 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_duration.update_layout(
-                    title="各バッチ配送时间(秒)",
+                    title="各バッチ配送時間(秒)",
                     xaxis=dict(title="バッチ"),
-                    yaxis=dict(title="时间(秒)"),
+                    yaxis=dict(title="時間(秒)"),
                     height=300,
                 )
                 st.plotly_chart(fig_duration, use_container_width=True)
         elif "配送履歴" in stats_data and stats_data["配送履歴"]:
-            # 将历史数据转换为DataFrame进行分析
+            # 履歴データをDataFrameに変換して分析
             history_df = pd.DataFrame(stats_data["配送履歴"])
             
-            # 批次订单数分布
+            # バッチ注文数分布
             if "orders_count" in history_df.columns:
                 st.subheader("バッチ注文数分布")
                 fig_batch = go.Figure()
@@ -319,7 +319,7 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                 )
                 st.plotly_chart(fig_batch, use_container_width=True)
             
-            # 批次配送路程分布
+            # バッチ配送距離分布
             if "path_length" in history_df.columns:
                 st.subheader("バッチ配送距離分布")
                 fig_path = go.Figure()
@@ -333,16 +333,16 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_path.update_layout(
-                    title="各バッチ配送路程",
+                    title="各バッチ配送距離",
                     xaxis=dict(title="バッチ"),
                     yaxis=dict(title="配送距離"),
                     height=300,
                 )
                 st.plotly_chart(fig_path, use_container_width=True)
                 
-            # 批次配送时间分布
+            # バッチ配送時間分布
             if "duration" in history_df.columns:
-                st.subheader("バッチ配送时间分布")
+                st.subheader("バッチ配送時間分布")
                 fig_duration = go.Figure()
                 fig_duration.add_trace(
                     go.Bar(
@@ -354,9 +354,9 @@ def render_plotly_stats_extended(stats_data, custom_metrics=None):
                     )
                 )
                 fig_duration.update_layout(
-                    title="各バッチ配送时间(秒)",
+                    title="各バッチ配送時間(秒)",
                     xaxis=dict(title="バッチ"),
-                    yaxis=dict(title="时间(秒)"),
+                    yaxis=dict(title="時間(秒)"),
                     height=300,
                 )
                 st.plotly_chart(fig_duration, use_container_width=True)

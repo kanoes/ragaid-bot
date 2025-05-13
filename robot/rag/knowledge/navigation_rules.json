@@ -1,0 +1,62 @@
+[
+  {
+    "content": "ロボットは障害物を検出した場合、まず右回りで回避を試みるべきである。",
+    "source": "navigation_manual",
+    "type": "rule",
+    "priority": "high"
+  },
+  {
+    "content": "障害物が移動している場合は、その動きを予測して回避経路を計画すること。",
+    "source": "navigation_manual",
+    "type": "rule",
+    "priority": "medium"
+  },
+  {
+    "content": "通路が狭い場合は、速度を下げて慎重に移動する。",
+    "source": "navigation_manual",
+    "type": "rule",
+    "priority": "high"
+  },
+  {
+    "content": "複数のロボットが接近している場合、IDの小さいロボットが優先的に通行する。",
+    "source": "traffic_rules",
+    "type": "rule",
+    "priority": "high"
+  },
+  {
+    "content": "ロボットの最大速度は混雑した場所では毎秒0.5メートル以下に抑えること。",
+    "source": "safety_guidelines",
+    "type": "rule",
+    "priority": "high"
+  },
+  {
+    "content": "緊急時には最短経路で目的地に向かうが、他のロボットや人間を優先すること。",
+    "source": "emergency_protocol",
+    "type": "rule",
+    "priority": "critical"
+  },
+  {
+    "content": "バッテリー残量が20%以下になった場合、充電ステーションへの移動を優先する。",
+    "source": "maintenance_guide",
+    "type": "rule",
+    "priority": "high"
+  },
+  {
+    "content": "同じ目的地に向かうロボットが複数ある場合、最も近いロボットが担当する。",
+    "source": "efficiency_guidelines",
+    "type": "rule",
+    "priority": "medium"
+  },
+  {
+    "content": "特別な指示がない限り、自動的に最短経路を選択する。",
+    "source": "default_behavior",
+    "type": "rule",
+    "priority": "low"
+  },
+  {
+    "content": "レストランの営業時間中は、客席エリアでの移動速度を通常の半分に制限する。",
+    "source": "restaurant_policy",
+    "type": "rule",
+    "priority": "medium"
+  }
+] 

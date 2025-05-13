@@ -1,5 +1,5 @@
 """
-编辑器相关组件
+エディター関連コンポーネント
 """
 
 import streamlit as st
@@ -28,25 +28,25 @@ from ..state import (
 
 def render_layout_editor():
     """
-    渲染布局编辑器界面
+    レイアウトエディターのインターフェイスをレンダリング
     
-    返回值:
-        dict: 编辑后的布局数据，如果未保存则返回None
+    戻り値:
+        dict: 編集後のレイアウトデータ。保存されていない場合はNoneを返す
     """
-    # 创建简单的表格式布局编辑器
-    st.subheader("餐厅布局编辑器")
+    # シンプルな表形式レイアウトエディターを作成
+    st.subheader("レストランレイアウトエディター")
     
-    # 布局尺寸控制
-    st.write("**网格尺寸控制**")
+    # レイアウトサイズコントロール
+    st.write("**グリッドサイズコントロール**")
     col1, col2, col3 = st.columns(3)
     
     with col1:
         current_height = get_editor_height()
         new_height = st.number_input(
-            "高度", min_value=3, max_value=30, value=current_height, key="editor_height_input"
+            "高さ", min_value=3, max_value=30, value=current_height, key="editor_height_input"
         )
         if new_height != current_height:
-            # 更改高度时保留现有数据
+            # 高さを変更するときに既存のデータを保持
             current_grid = get_editor_grid()
             current_width = get_editor_width()
             new_grid = [[0 for _ in range(current_width)] for _ in range(new_height)]
@@ -56,7 +56,7 @@ def render_layout_editor():
             set_editor_grid(new_grid)
             set_editor_height(new_height)
             
-            # 更新表格位置
+            # テーブル位置を更新
             tables = get_editor_tables()
             tables = {k: v for k, v in tables.items() if v[0] < new_height}
             set_editor_tables(tables)
@@ -74,10 +74,10 @@ def render_layout_editor():
     with col2:
         current_width = get_editor_width()
         new_width = st.number_input(
-            "宽度", min_value=3, max_value=30, value=current_width, key="editor_width_input"
+            "幅", min_value=3, max_value=30, value=current_width, key="editor_width_input"
         )
         if new_width != current_width:
-            # 更改宽度时保留现有数据
+            # 幅を変更するときに既存のデータを保持
             current_grid = get_editor_grid()
             current_height = get_editor_height()
             new_grid = [[0 for _ in range(new_width)] for _ in range(current_height)]
@@ -87,7 +87,7 @@ def render_layout_editor():
             set_editor_grid(new_grid)
             set_editor_width(new_width)
 
-            # 更新表格位置
+            # テーブル位置を更新
             tables = get_editor_tables()
             tables = {k: v for k, v in tables.items() if v[1] < new_width}
             set_editor_tables(tables)
@@ -104,34 +104,34 @@ def render_layout_editor():
 
     with col3:
         current_name = get_editor_layout_name()
-        layout_name = st.text_input("布局名称", value=current_name, key="editor_layout_name_input")
+        layout_name = st.text_input("レイアウト名", value=current_name, key="editor_layout_name_input")
         if layout_name != current_name:
             set_editor_layout_name(layout_name)
 
-    # 创建用于布局编辑的视觉界面
-    st.subheader("布局编辑")
-    st.write("点击网格单元格更改类型")
+    # レイアウト編集用の視覚インターフェイスを作成
+    st.subheader("レイアウト編集")
+    st.write("グリッドセルをクリックしてタイプを変更")
 
-    # 为布局编辑创建多列布局
+    # レイアウト編集用に多列レイアウトを作成
     edit_col1, edit_col2 = st.columns([3, 1])
     
     with edit_col2:
-        st.write("**元素工具箱**")
-        # 选择要编辑的元素类型
+        st.write("**要素ツールボックス**")
+        # 編集する要素タイプを選択
         element_type = st.radio(
-            "选择元素类型", 
-            ["墙/障碍物", "空地", "餐桌", "厨房", "停车点"],
+            "要素タイプを選択", 
+            ["壁/障害物", "空き地", "テーブル", "キッチン", "駐車場"],
             captions=["#", ".", "A-Z", "厨", "停"],
             key="element_type_radio"
         )
         
-        # 显示当前元素的颜色
+        # 表示現在の要素の色
         element_colors = {
-            "墙/障碍物": "#333333",
-            "空地": "white",
-            "餐桌": "#00cc66",
-            "厨房": "#f5c518",
-            "停车点": "#4da6ff"
+            "壁/障害物": "#333333",
+            "空き地": "white",
+            "テーブル": "#00cc66",
+            "キッチン": "#f5c518",
+            "駐車場": "#4da6ff"
         }
         
         st.markdown(
@@ -144,7 +144,7 @@ def render_layout_editor():
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                color: {"black" if element_type != "墙/障碍物" else "white"};
+                color: {"black" if element_type != "壁/障害物" else "white"};
                 font-weight: bold;
             ">
                 {element_type}
@@ -153,67 +153,67 @@ def render_layout_editor():
             unsafe_allow_html=True
         )
         
-        # 餐桌模式时，需要输入餐桌ID
+        # テーブルモード時、テーブルIDを入力する必要があります
         table_id = None
-        if element_type == "餐桌":
-            table_id = st.text_input("餐桌ID (单个字母 A-Z)", max_chars=1, key="table_id_input")
+        if element_type == "テーブル":
+            table_id = st.text_input("テーブルID (1つのアルファベット A-Z)", max_chars=1, key="table_id_input")
             if table_id and (not table_id.isalpha() or len(table_id) != 1):
-                st.warning("餐桌ID必须是单个字母(A-Z)")
+                st.warning("テーブルIDは1つのアルファベット(A-Z)でなければなりません")
                 
-        # 显示布局统计信息
-        st.write("**布局统计**")
+        # レイアウト統計情報を表示
+        st.write("**レイアウト統計**")
         tables = get_editor_tables()
         kitchen = get_editor_kitchen()
         parking = get_editor_parking()
         
         st.markdown(f"""
-        - 网格大小: {get_editor_height()} × {get_editor_width()}
-        - 餐桌: {len(tables)} 个
-        - 厨房: {len(kitchen)} 个
-        - 停车点: {"有" if parking else "无"}
+        - グリッドサイズ: {get_editor_height()} × {get_editor_width()}
+        - テーブル: {len(tables)} 個
+        - キッチン: {len(kitchen)} 個
+        - 駐車場: {"あり" if parking else "なし"}
         """)
         
-        # 操作按钮
+        # 操作ボタン
         st.write("**操作**")
-        if st.button("重置布局", key="editor_reset_button"):
-            # 重置为空白布局
+        if st.button("レイアウトをリセット", key="editor_reset_button"):
+            # 空白レイアウトにリセット
             reset_editor()
             st.rerun()
             
-        if st.button("自动添加墙壁", key="editor_add_walls_button"):
-            # 在布局边缘添加墙壁
+        if st.button("自動で壁を追加", key="editor_add_walls_button"):
+            # レイアウトの端に壁を追加
             grid = get_editor_grid()
             height = get_editor_height()
             width = get_editor_width()
 
-            # 添加上下墙壁
+            # 上下壁を追加
             for j in range(width):
                 grid[0][j] = 1
                 grid[height - 1][j] = 1
 
-            # 添加左右墙壁
+            # 左右壁を追加
             for i in range(height):
                 grid[i][0] = 1
                 grid[i][width - 1] = 1
 
-            # 更新布局
+            # レイアウトを更新
             set_editor_grid(grid)
             st.rerun()
     
     with edit_col1:
-        # 创建Plotly图表实现交互式编辑
+        # Plotlyチャートを使用してインタラクティブ編集を実装
         fig = render_interactive_editor_grid()
         
-        # 使用plotly_events显示图表并监听点击事件
+        # plotly_eventsを使用してチャートを表示し、クリックイベントを監視
         clicked_point = plotly_events(fig, click_event=True, key="layout_editor_plotly")
         
         if clicked_point:
-            # 获取点击的坐标
+            # クリックされた座標を取得
             try:
                 point_data = clicked_point[0]
                 row, col = int(point_data["y"]), int(point_data["x"])
                 
-                # 获取当前状态
+                # 現在の状態を取得
                 grid = get_editor_grid()
                 tables = get_editor_tables()
                 kitchen = get_editor_kitchen()
@@ -221,20 +221,20 @@ def render_layout_editor():
                 height = get_editor_height()
                 width = get_editor_width()
                 
-                # 确保坐标在有效范围内
+                # 座標が有効範囲内にあることを確認
                 if 0 <= row < height and 0 <= col < width:
                     
-                    # 处理特殊元素类型
-                    if element_type == "餐桌":
+                    # 特殊要素タイプの処理
+                    if element_type == "テーブル":
                         if table_id:
-                            # 更新表格位置，同一ID只能有一个
+                            # テーブル位置を更新、同一IDは1つのみ
                             for k, v in list(tables.items()):
                                 if k == table_id:
                                     tables.pop(k)
                             tables[table_id] = (row, col)
                             grid[row][col] = 2
                             
-                            # 如果这个位置之前是其他特殊元素，需要移除
+                            # この位置が以前に他の特殊要素である場合は削除
                             for k, v in list(tables.items()):
                                 if v == (row, col) and k != table_id:
                                     tables.pop(k)
@@ -245,13 +245,13 @@ def render_layout_editor():
                             if parking == (row, col):
                                 parking = None
                     
-                    elif element_type == "厨房":
-                        # 更新厨房位置，可以有多个
+                    elif element_type == "キッチン":
+                        # キッチン位置を更新、複数可能
                         if (row, col) not in kitchen:
                             kitchen.append((row, col))
                         grid[row][col] = 3
                         
-                        # 移除其他重叠的元素
+                        # 他の重複要素を削除
                         for k, v in list(tables.items()):
                             if v == (row, col):
                                 tables.pop(k)
@@ -259,12 +259,12 @@ def render_layout_editor():
                         if parking == (row, col):
                             parking = None
                     
-                    elif element_type == "停车点":
-                        # 更新停车点，只能有一个
+                    elif element_type == "駐車場":
+                        # 駐車場を更新、1つのみ
                         parking = (row, col)
                         grid[row][col] = 4
                         
-                        # 移除其他重叠的元素
+                        # 他の重複要素を削除
                         for k, v in list(tables.items()):
                             if v == (row, col):
                                 tables.pop(k)
@@ -272,8 +272,8 @@ def render_layout_editor():
                         if (row, col) in kitchen:
                             kitchen.remove((row, col))
                     
-                    elif element_type == "空地":
-                        # 清除该位置的所有元素
+                    elif element_type == "空き地":
+                        # 該当位置のすべての要素を削除
                         grid[row][col] = 0
                         
                         for k, v in list(tables.items()):
@@ -286,10 +286,10 @@ def render_layout_editor():
                         if parking == (row, col):
                             parking = None
                     
-                    else:  # 墙/障碍物
+                    else:  # 壁/障害物
                         grid[row][col] = 1
                         
-                        # 移除重叠的元素
+                        # 重複要素を削除
                         for k, v in list(tables.items()):
                             if v == (row, col):
                                 tables.pop(k)
@@ -300,29 +300,29 @@ def render_layout_editor():
                         if parking == (row, col):
                             parking = None
                     
-                    # 更新状态
+                    # 状態を更新
                     set_editor_grid(grid)
                     set_editor_tables(tables)
                     set_editor_kitchen(kitchen)
                     set_editor_parking(parking)
                     
-                    # 强制重新渲染
+                    # 強制的に再レンダリング
                     st.rerun()
             except Exception as e:
-                st.error(f"处理点击事件时出错: {e}")
+                st.error(f"クリックイベントの処理中にエラーが発生: {e}")
         
-    # 保存按钮区域
+    # 保存ボタン領域
     save_col1, save_col2 = st.columns([3, 1])
         
     with save_col2:
-        if st.button("保存布局", key="editor_save_layout_button", type="primary"):
-            # 验证布局有效性
+        if st.button("レイアウトを保存", key="editor_save_layout_button", type="primary"):
+            # レイアウトの有効性を検証
             is_valid, message = validate_layout_extended()
             if not is_valid:
-                st.error(f"布局无效! {message}")
+                st.error(f"レイアウトが無効です! {message}")
                 return None
 
-            # 返回当前编辑的布局数据
+            # 現在編集中のレイアウトデータを返す
             return {
                 "name": get_editor_layout_name(),
                 "grid": get_editor_grid(),
@@ -336,10 +336,10 @@ def render_layout_editor():
 
 def render_interactive_editor_grid():
     """
-    渲染交互式可编辑的Plotly餐厅布局网格，增强版
+    インタラクティブに編集可能なPlotlyレストランレイアウトグリッドをレンダリング、強化版
 
-    返回值:
-        go.Figure: Plotly图表对象
+    戻り値:
+        go.Figure: Plotlyチャートオブジェクト
     """
     grid = get_editor_grid()
     height = get_editor_height()
@@ -348,54 +348,54 @@ def render_interactive_editor_grid():
     kitchen = get_editor_kitchen()
     parking = get_editor_parking()
 
-    # 颜色映射
+    # カラーマップ
     colormap = {
-        0: "white",         # 空地
-        1: "#333333",       # 墙/障碍物
-        2: "#00cc66",       # 餐桌
-        3: "#f5c518",       # 厨房
-        4: "#4da6ff",       # 停车点
+        0: "white",         # 空き地
+        1: "#333333",       # 壁/障害物
+        2: "#00cc66",       # テーブル
+        3: "#f5c518",       # キッチン
+        4: "#4da6ff",       # 駐車場
     }
 
-    # 标签映射
+    # ラベルマップ
     labels = [["" for _ in range(width)] for _ in range(height)]
 
-    # 餐桌标签
+    # テーブルラベル
     for table_id, pos in tables.items():
         row, col = pos
-        if 0 <= row < height and 0 <= col < width:  # 防止越界
+        if 0 <= row < height and 0 <= col < width:  # 範囲外を防ぐ
             labels[row][col] = table_id
 
-    # 厨房标签
+    # キッチンラベル
     for row, col in kitchen:
-        if 0 <= row < height and 0 <= col < width:  # 防止越界
+        if 0 <= row < height and 0 <= col < width:  # 範囲外を防ぐ
             labels[row][col] = "厨"
 
-    # 停车点标签
+    # 駐車場ラベル
     if parking:
         row, col = parking
-        if 0 <= row < height and 0 <= col < width:  # 防止越界
+        if 0 <= row < height and 0 <= col < width:  # 範囲外を防ぐ
             labels[row][col] = "停"
 
-    # 创建图表
+    # チャートを作成
     fig = go.Figure()
 
-    # 热力图数据
+    # ヒートマップデータ
     heatmap_z = np.array(grid)
     colorscale = [
-        [0, colormap[0]],      # 空地
+        [0, colormap[0]],      # 空き地
         [0.2, colormap[0]],
-        [0.2, colormap[1]],    # 墙/障碍物
+        [0.2, colormap[1]],    # 壁/障害物
         [0.4, colormap[1]],
-        [0.4, colormap[2]],    # 餐桌
+        [0.4, colormap[2]],    # テーブル
         [0.6, colormap[2]],
-        [0.6, colormap[3]],    # 厨房
+        [0.6, colormap[3]],    # キッチン
         [0.8, colormap[3]],
-        [0.8, colormap[4]],    # 停车点
+        [0.8, colormap[4]],    # 駐車場
         [1.0, colormap[4]],
     ]
 
-    # 生成每个单元格的悬停文本
+    # 各セルのホバーテキストを生成
     hover_texts = []
     for i in range(height):
         row_texts = []
@@ -411,12 +411,12 @@ def render_interactive_editor_grid():
             showscale=False,
             hoverinfo="text",
             hovertext=hover_texts,
-            # 禁用默认的heatmap提示
+            # デフォルトのheatmapツールチップを無効にする
             zhoverformat="none"
         )
     )
 
-    # 文本注释 - 显示标签
+    # テキスト注釈 - ラベルを表示
     for i in range(height):
         for j in range(width):
             if labels[i][j]:
@@ -432,7 +432,7 @@ def render_interactive_editor_grid():
                     ),
                 )
 
-    # 设置图表布局
+    # チャートレイアウトを設定
     fig.update_layout(
         width=min(800, max(400, width * 35)),
         height=min(800, max(400, height * 35)),
@@ -480,7 +480,7 @@ def render_interactive_editor_grid():
     fig.add_annotation(
         xref="paper", yref="paper",
         x=0.5, y=-0.07,
-        text="点击任意单元格应用当前选择的元素类型",
+        text="クリックして任意のセルに現在選択されている要素タイプを適用",
         showarrow=False,
         font=dict(size=12, color="grey"),
     )
@@ -490,45 +490,45 @@ def render_interactive_editor_grid():
 
 def validate_layout_extended():
     """
-    验证布局是否有效，并提供详细的错误信息
+    レイアウトが有効かどうかを検証し、詳細なエラーメッセージを提供
     
-    返回值:
-        tuple: (is_valid, message) 布局是否有效及详细信息
+    戻り値:
+        tuple: (is_valid, message) レイアウトが有効かどうかと詳細情報
     """
-    # 检查是否至少有一个餐桌
+    # テーブルが少なくとも1つあるかどうかを確認
     if not get_editor_tables():
-        return False, "至少需要一个餐桌"
+        return False, "少なくとも1つのテーブルが必要です"
 
-    # 检查是否至少有一个厨房
+    # キッチンが少なくとも1つあるかどうかを確認
     if not get_editor_kitchen():
-        return False, "至少需要一个厨房"
+        return False, "少なくとも1つのキッチンが必要です"
 
-    # 检查是否至少有一个停车点
+    # 駐車場が少なくとも1つあるかどうかを確認
     if not get_editor_parking():
-        return False, "至少需要一个停车点"
+        return False, "少なくとも1つの駐車場が必要です"
         
-    # 检查布局名称
+    # レイアウト名を確認
     if not get_editor_layout_name() or get_editor_layout_name() == "新レイアウト":
-        return False, "请提供有效的布局名称"
+        return False, "有効なレイアウト名を提供してください"
 
-    return True, "布局有效"
+    return True, "レイアウトが有効です"
 
 
 def get_cell_description(row, col):
     """
-    获取单元格的描述文本，用于悬停提示
+    セルの説明テキストを取得し、ホバーツールチップに使用
     """
     grid = get_editor_grid()
     if row >= len(grid) or col >= len(grid[0]):
         return ""
 
     cell_type = grid[row][col]
-    descriptions = {0: "空地", 1: "墙/障碍物", 2: "餐桌", 3: "厨房", 4: "停车点"}
+    descriptions = {0: "空き地", 1: "壁/障害物", 2: "テーブル", 3: "キッチン", 4: "駐車場"}
 
     base_desc = f"({row}, {col}): {descriptions.get(cell_type, '未知')}"
 
-    # 添加额外信息
-    if cell_type == 2:  # 餐桌
+    # 追加情報を追加
+    if cell_type == 2:  # テーブル
         for tid, pos in get_editor_tables().items():
             if pos == (row, col):
                 return f"{base_desc} {tid}"

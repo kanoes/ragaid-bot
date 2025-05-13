@@ -1,5 +1,5 @@
 """
-RAG测试相关组件
+RAGテスト関連コンポーネント
 """
 
 import os
@@ -10,21 +10,21 @@ dotenv.load_dotenv()
 
 def render_rag_test():
     """
-    渲染RAG测试界面，允许用户直接测试RAG模块的QA能力
+    RAGテストインターフェイスをレンダリングし、ユーザーがRAGモジュールのQA機能を直接テストできるようにします
     """
     from robot.rag import RAGModule
 
     st.header("RAGシステムテスト")
 
-    # 使用OpenAI API密钥
+    # OpenAI APIキーを使用
     api_key = os.environ.get("OPENAI_API_KEY", None)
 
-    # 初始化RAG模块
+    # RAGモジュールを初期化
     current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     knowledge_file = os.path.join(current_dir, "robot", "rag", "knowledge", "restaurant_rule.json")
     print(knowledge_file)
 
-    # 如果会话状态中不存在RAG模块，则初始化
+    # セッション状態にRAGモジュールが存在しない場合は初期化
     if "rag_module" not in st.session_state:
         rag = RAGModule(
             api_key=api_key,
@@ -34,16 +34,16 @@ def render_rag_test():
     else:
         rag = st.session_state["rag_module"]
 
-    # 检查RAG模块的准备状态
+    # RAGモジュールの準備状態を確認
     if not rag.is_ready():
         st.warning("ナレッジベースがロードされていない、またはAPIキーが設定されていません。純粋なLLM回答が使用される可能性があります。")
     else:
         st.success(f"ナレッジベースを正常にロードしました: {knowledge_file}")
 
-    # 创建测试界面
+    # テストインターフェイスを作成
     test_tabs = st.tabs(["QAテスト", "思考レイヤーテスト", "トリガーレイヤーテスト", "意思決定インターフェーステスト"])
 
-    # QA测试标签
+    # QAテストタブ
     with test_tabs[0]:
         st.subheader("直接QAテスト")
         query = st.text_input("質問を入力してください：（例：現在ありオーダー3番卓、5番卓、8番卓、配達順序を教えて）", key="qa_query")
@@ -61,7 +61,7 @@ def render_rag_test():
                     except Exception as e:
                         st.error(f"エラーが発生しました: {e}")
 
-    # 思考层测试标签
+    # 思考レイヤーテストタブ
     with test_tabs[1]:
         st.subheader("思考レイヤーテスト")
         query = st.text_input("質問を入力してください：（例：現在ありオーダー3番卓、5番卓、8番卓、配達順序を教えて）", key="thinking_query")
@@ -75,7 +75,7 @@ def render_rag_test():
                     try:
                         raw_response, context_docs = rag.thinking_layer(query, use_rag=use_rag)
 
-                        # 显示结果
+                        # 結果を表示
                         st.write("#### 思考レイヤー出力")
                         st.write(f"**取得したドキュメント数:** {len(context_docs)} 件")
 
@@ -86,7 +86,7 @@ def render_rag_test():
                         st.write("#### LLMの生レスポンス:")
                         st.info(raw_response)
 
-                        # 显示决策层处理结果
+                        # 決定レイヤー処理結果を表示
                         action = rag.decision_layer(raw_response)
                         st.write("#### 意思決定レイヤー簡易結果:")
                         st.success(action)
@@ -94,7 +94,7 @@ def render_rag_test():
                     except Exception as e:
                         st.error(f"エラーが発生しました: {e}")
 
-    # 触发层测试标签
+    # トリガーレイヤーテストタブ
     with test_tabs[2]:
         st.subheader("トリガーレイヤーテスト")
         event_type = st.selectbox(
@@ -136,7 +136,7 @@ def render_rag_test():
                 try:
                     result = rag.trigger_layer(event_type, context)
 
-                    # 显示结果
+                    # 結果を表示
                     st.write("#### トリガーレイヤー結果")
                     st.write(f"**アクション:** {result['action']}")
                     st.write(f"**コンテキスト使用:** {result['context_used']}")
@@ -155,7 +155,7 @@ def render_rag_test():
                 except Exception as e:
                     st.error(f"エラーが発生しました: {e}")
 
-    # 决策接口测试标签
+    # 決定インターフェーステストタブ
     with test_tabs[3]:
         st.subheader("意思決定インターフェーステスト")
         situation_type = st.selectbox(
@@ -197,7 +197,7 @@ def render_rag_test():
                 try:
                     action = rag.make_decision(situation_type, **kwargs)
 
-                    # 显示结果
+                    # 結果を表示
                     st.write("#### 意思決定結果")
                     st.success(action)
 

@@ -33,6 +33,14 @@
 
 ## 環境構築&起動
 
+### 共通
+
+- エクステンションをインストール（必須）
+
+```bash
+cat extensions.txt | xargs -n 1 code --install-extension
+```
+
 ### venv
 
 #### Windows環境
