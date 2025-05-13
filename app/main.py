@@ -1,5 +1,5 @@
 """
-Streamlit Web App 主页面逻辑
+Streamlit Web App メインページロジック
 """
 
 import gc
@@ -40,250 +40,250 @@ from .state import (
 
 def run():
     """
-    运行Streamlit应用
+    Streamlitアプリケーションを実行
     """
-    # 配置页面和性能优化
+    # ページの設定とパフォーマンス最適化
     setup_page()
     init_session_state()
 
-    # 性能优化：限制Plotly渲染过程中的内存消耗
+    # パフォーマンス最適化：Plotlyレンダリング中のメモリ消費を制限
     if "plotly_performance_tuned" not in st.session_state:
         st.session_state["plotly_performance_tuned"] = True
-        # 强制垃圾回收
+        # 強制ガベージコレクション
         gc.collect()
 
-    # 性能优化：使用内存效率更高的绘图设置
+    # パフォーマンス最適化：メモリ効率の高い描画設定を使用
     if "performance_config" not in st.session_state:
         st.session_state["performance_config"] = {
-            "max_points_per_chart": 1000,  # 限制每个图表的最大点数
-            "use_webgl": True,  # 使用WebGL渲染（如果浏览器支持）
-            "batch_size": 10,  # 批处理大小
+            "max_points_per_chart": 1000,  # 各チャートの最大ポイント数を制限
+            "use_webgl": True,  # WebGLレンダリングを使用（ブラウザがサポートしている場合）
+            "batch_size": 10,  # バッチサイズ
         }
 
-    # 获取可用布局
+    # 利用可能なレイアウトを取得
     layouts = available_layouts()
 
-    # --- Sidebar 布局选择 & 参数 ---
-    # 渲染布局下拉框，确保后续依赖它的控件拿到最新的 restaurant
+    # --- サイドバー レイアウト選択 & パラメータ ---
+    # レイアウトドロップダウンをレンダリング、後続の依存するウィジェットが最新のレストランを取得できるようにする
     if layouts:
         selected_layout = st.sidebar.selectbox(
-            "选择餐厅布局", layouts, key="layout_select"
+            "レストランレイアウトを選択", layouts, key="layout_select"
         )
     else:
         selected_layout = None
 
-    # 获取当前餐厅并在切换时立即更新
+    # 現在のレストランを取得し、切り替え時に即時更新
     restaurant = get_restaurant()
     if selected_layout and (restaurant is None or selected_layout != restaurant.name):
-        # 添加调试日志
-        logger.info(f"当前餐厅: {restaurant.name if restaurant else 'None'}")
-        logger.info(f"选择布局: {selected_layout}")
+        # デバッグログを追加
+        logger.info(f"現在のレストラン: {restaurant.name if restaurant else 'None'}")
+        logger.info(f"選択レイアウト: {selected_layout}")
         
-        # 加载新布局
+        # 新しいレイアウトをロード
         restaurant = handle_layout_selection(selected_layout)
         set_restaurant(restaurant)
-        logger.info(f"加载餐厅布局完成: {restaurant.name}")
+        logger.info(f"レストランレイアウトのロード完了: {restaurant.name}")
         
-        # 强制刷新页面 - 确保UI更新
+        # 強制ページ更新 - UIの更新を確保
         st.rerun()
 
-    # 其他 sidebar 控件
-    use_ai = st.sidebar.checkbox("使用 RAG 智能机器人", value=False, key="use_ai")
+    # その他のサイドバーウィジェット
+    use_ai = st.sidebar.checkbox("RAGインテリジェントロボットを使用", value=False, key="use_ai")
     num_tables = (
         len(restaurant.layout.tables) if (restaurant and restaurant.layout) else 1
     )
     num_orders = st.sidebar.slider(
-        "订单数量", 1, max(1, num_tables), 1, key="num_orders"
+        "注文数", 1, max(1, num_tables), 1, key="num_orders"
     )
-    sim_button = st.sidebar.button("开始模拟", key="sim_button")
+    sim_button = st.sidebar.button("シミュレーション開始", key="sim_button")
 
-    # --- 主界面标签页 ---
-    tab1, tab2, tab3, tab4 = st.tabs(["模拟器", "数据分析", "布局编辑器", "RAG测试"])
+    # --- メインインターフェースタブ ---
+    tab1, tab2, tab3, tab4 = st.tabs(["シミュレーター", "データ分析", "レイアウトエディター", "RAGテスト"])
 
     with tab1:
-        # 可视化当前布局
+        # 現在のレイアウトを可視化
         if restaurant:
-            # 使用无缓存版本，确保每次都显示最新布局
+            # キャッシュなしのバージョンを使用し、毎回最新のレイアウトを表示
             render_plotly_restaurant_layout_no_cache(restaurant)
 
-        # 处理模拟
+        # シミュレーション処理
         if sim_button and restaurant:
             stats, path_histories = handle_simulation(restaurant, use_ai, num_orders)
             set_stats(stats)
             set_path_histories(path_histories)
 
-        # 显示路径可视化
+        # 経路の可視化を表示
         path_histories = get_path_histories()
         if path_histories and restaurant:
-            st.subheader("配送路径可视化")
+            st.subheader("配達経路の可視化")
             
-            # 显示所有被分配的订单信息
+            # 割り当てられたすべての注文情報を表示
             if path_histories[0].get("orders"):
                 orders = path_histories[0]["orders"]
-                st.write(f"**分配的所有订单 ({len(orders)}个):**")
+                st.write(f"**割り当てられたすべての注文 ({len(orders)}件):**")
                 order_df = pd.DataFrame(orders)
                 st.dataframe(order_df, use_container_width=True)
             
-            # 显示路径
-            st.write("**配送路径:**")
+            # 経路を表示
+            st.write("**配達経路:**")
             render_plotly_robot_path(
                 restaurant,
                 path_histories[0]["path"],
                 orders=path_histories[0].get("orders", []),
-                title=f"机器人 #{path_histories[0]['robot_id']} 配送路径（从停靠点出发并返回）",
+                title=f"ロボット #{path_histories[0]['robot_id']} 配達経路（駐車場から出発して戻る）",
             )
 
     with tab2:
-        # 显示统计结果
+        # 統計結果を表示
         stats = get_stats()
         if stats:
-            # 基本统计
+            # 基本統計
             render_stats(stats)
 
-            # Plotly统计可视化
+            # Plotly統計可視化
             render_plotly_stats(stats)
             
-            # 显示历史数据部分
+            # 履歴データ部分を表示
             batch_histories = get_batch_histories()
             
-            # 历史数据部分
-            if batch_histories:  # 优先使用累积的历史批次数据
-                # 使用列布局放置标题和重置按钮
+            # 履歴データ部分
+            if batch_histories:  # 累積履歴バッチデータを優先使用
+                # 見出しとリセットボタンを配置するためのカラムレイアウトを使用
                 col1, col2 = st.columns([6, 1])
                 with col1:
-                    st.subheader("历史模拟数据")
+                    st.subheader("履歴シミュレーションデータ")
                 with col2:
-                    st.write("")  # 添加空行以对齐按钮
-                    reset_btn = st.button("🔄", key="reset_batch_data", help="重置历史数据")
+                    st.write("")  # ボタンを揃えるための空行を追加
+                    reset_btn = st.button("🔄", key="reset_batch_data", help="履歴データをリセット")
                     if reset_btn:
                         reset_batch_histories()
-                        st.success("已重置所有历史批次数据")
+                        st.success("すべての履歴バッチデータをリセットしました")
                         st.rerun()
                         
                 history_df = pd.DataFrame(batch_histories)
                 
-                # 显示友好的列名
+                # フレンドリーな列名を表示
                 display_columns = {
-                    "batch_id": "模拟轮数",
-                    "total_time": "配送完成时间",
-                    "path_length": "总配送路程",
-                    "avg_waiting_time": "平均订单等待时间",
-                    "机器人类型": "机器人类型",
-                    "餐厅布局": "餐厅布局"
+                    "batch_id": "シミュレーション回数",
+                    "total_time": "配達完了時間",
+                    "path_length": "総配達距離",
+                    "avg_waiting_time": "平均注文待ち時間",
+                    "機器人类型": "ロボットタイプ",
+                    "レストランレイアウト": "レストランレイアウト"
                 }
                 
-                # 选择并重命名要显示的列
+                # 表示する列を選択し、名前を変更
                 if history_df.empty:
-                    st.info("暂无历史数据")
+                    st.info("履歴データがありません")
                 else:
                     display_df = history_df[[col for col in display_columns.keys() if col in history_df.columns]]
                     display_df.columns = [display_columns[col] for col in display_df.columns]
                     
-                    # 格式化数字列，去除单位
-                    for col in ["配送完成时间", "总配送路程", "平均订单等待时间"]:
+                    # 数値列をフォーマット、単位を削除
+                    for col in ["配達完了時間", "総配達距離", "平均注文待ち時間"]:
                         if col in display_df.columns:
                             display_df[col] = display_df[col].apply(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
                     
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
-            elif "配送历史" in stats and stats["配送历史"]:  # 如果没有累积数据，使用当前模拟数据
+            elif "配送历史" in stats and stats["配送历史"]:  # 累積データがない場合、現在のシミュレーションデータを使用
                 col1, col2 = st.columns([6, 1])
                 with col1:
-                    st.subheader("历史数据")
+                    st.subheader("履歴データ")
                 with col2:
-                    st.write("")  # 添加空行以对齐按钮
-                    reset_btn = st.button("🔄", key="reset_batch_data", help="重置历史数据")
+                    st.write("")  # ボタンを揃えるための空行を追加
+                    reset_btn = st.button("🔄", key="reset_batch_data", help="履歴データをリセット")
                     if reset_btn:
                         reset_batch_histories()
-                        st.success("已重置所有历史批次数据")
+                        st.success("すべての履歴バッチデータをリセットしました")
                         st.rerun()
                         
                 history_df = pd.DataFrame(stats["配送历史"])
                 
-                # 显示友好的列名
+                # フレンドリーな列名を表示
                 display_columns = {
-                    "batch_id": "模拟轮数",
-                    "total_time": "配送完成时间",
-                    "path_length": "总配送路程",
-                    "avg_waiting_time": "平均订单等待时间",
-                    "机器人类型": "机器人类型",
-                    "餐厅布局": "餐厅布局"
+                    "batch_id": "シミュレーション回数",
+                    "total_time": "配達完了時間",
+                    "path_length": "総配達距離",
+                    "avg_waiting_time": "平均注文待ち時間",
+                    "機器人类型": "ロボットタイプ",
+                    "レストランレイアウト": "レストランレイアウト"
                 }
                 
-                # 选择并重命名要显示的列
+                # 表示する列を選択し、名前を変更
                 if history_df.empty:
-                    st.info("暂无历史数据")
+                    st.info("履歴データがありません")
                 else:
                     display_df = history_df[[col for col in display_columns.keys() if col in history_df.columns]]
                     display_df.columns = [display_columns[col] for col in display_df.columns]
                     
-                    # 格式化数字列，去除单位
-                    for col in ["配送完成时间", "总配送路程", "平均订单等待时间"]:
+                    # 数値列をフォーマット、単位を削除
+                    for col in ["配達完了時間", "総配達距離", "平均注文待ち時間"]:
                         if col in display_df.columns:
                             display_df[col] = display_df[col].apply(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
                     
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
             else:
-                st.subheader("历史数据")
-                st.info("暂无批次历史数据")
+                st.subheader("履歴データ")
+                st.info("履歴バッチデータがありません")
 
     with tab3:
-        st.header("餐厅布局管理")
+        st.header("レストランレイアウト管理")
 
-        # 布局列表 和 删除按钮
+        # レイアウトリストと削除ボタン
         col1, col2 = st.columns([3, 1])
         with col1:
             if layouts:
                 layout_to_edit = st.selectbox(
-                    "编辑现有布局", ["创建新布局"] + layouts, key="layout_editor_select"
+                    "既存レイアウトを編集", ["新しいレイアウトを作成"] + layouts, key="layout_editor_select"
                 )
             else:
-                st.info("当前没有可用的布局，请创建新布局")
-                layout_to_edit = "创建新布局"
+                st.info("現在利用可能なレイアウトがありません。新しいレイアウトを作成してください")
+                layout_to_edit = "新しいレイアウトを作成"
         with col2:
-            if layout_to_edit != "创建新布局" and st.button(
-                "删除所选布局", key="delete_layout"
+            if layout_to_edit != "新しいレイアウトを作成" and st.button(
+                "選択されたレイアウトを削除", key="delete_layout"
             ):
                 if handle_layout_delete(layout_to_edit):
-                    st.success(f"已删除布局: {layout_to_edit}")
-                    # 如果删除的布局正是当前使用的，则清除
+                    st.success(f"レイアウト: {layout_to_edit} を削除しました")
+                    # 削除されたレイアウトが現在使用中の場合、クリア
                     if restaurant and restaurant.name == layout_to_edit:
                         set_restaurant(None)
                         st.rerun()
 
-        # 加载或创建新布局
-        if layout_to_edit != "创建新布局" and not is_editor_loaded():
-            # 加载已有布局对象到编辑器
+        # 既存レイアウトをロードまたは新しいレイアウトを作成
+        if layout_to_edit != "新しいレイアウトを作成" and not is_editor_loaded():
+            # 既存レイアウトオブジェクトをエディターにロード
             restaurant_to_edit = handle_layout_selection(layout_to_edit)
             load_layout_to_editor(restaurant_to_edit)
             set_editor_loaded(True)
-        elif layout_to_edit == "创建新布局" and is_editor_loaded():
+        elif layout_to_edit == "新しいレイアウトを作成" and is_editor_loaded():
             set_editor_loaded(False)
             st.rerun()
 
-        # 渲染编辑器
+        # エディターをレンダリング
         new_layout = render_layout_editor()
 
-        # 保存布局按钮
+        # レイアウト保存ボタン
         save_col1, save_col2 = st.columns([3, 1])
         with save_col1:
             layout_name = st.text_input(
-                "布局名称",
-                value=layout_to_edit if layout_to_edit != "创建新布局" else "",
+                "レイアウト名",
+                value=layout_to_edit if layout_to_edit != "新しいレイアウトを作成" else "",
                 key="layout_name",
             )
 
         with save_col2:
             st.write("")
             st.write("")
-            if st.button("保存布局", key="save_layout") and layout_name and new_layout:
-                # 更新布局名称并保存到同一目录
+            if st.button("レイアウトを保存", key="save_layout") and layout_name and new_layout:
+                # レイアウト名を更新して保存
                 new_layout["name"] = layout_name
                 saved_restaurant = handle_layout_save(new_layout)
                 if saved_restaurant:
-                    st.success(f"已保存布局: {layout_name}")
-                    # 自动将新布局设为当前餐厅
+                    st.success(f"レイアウト: {layout_name} を保存しました")
+                    # 新しいレイアウトを現在のレストランに設定
                     set_restaurant(saved_restaurant)
 
-    # 添加RAG测试标签页
+    # RAGテストタブを追加
     with tab4:
         render_rag_test()

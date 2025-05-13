@@ -1,15 +1,15 @@
 """
-RestaurantLayout – 餐厅平面图数据结构。
+RestaurantLayout – レストラン平面図データ構造。
 
-数字表示方式
+数値表現方式
 -----------
 0     空地
-1     墙壁/障碍物
-2-99   桌子编号(例如21表示21号桌)
-100    厨房
-200    停靠点
+1     壁/障害物
+2-99   テーブル番号（例えば21は21番テーブル）
+100    キッチン
+200    駐車ポイント
 
-布局文件直接使用数字矩阵定义，不再需要使用字符标记。
+レイアウトファイルは直接数値マトリックスで定義され、文字マーカーを使用する必要はありません。
 """
 
 from __future__ import annotations
@@ -19,10 +19,10 @@ from typing import List, Tuple, Dict, Optional
 
 class RestaurantLayout:
     """
-    二维网格的餐厅布局
+    二次元グリッドのレストランレイアウト
     """
 
-    # ----- 构造 -------------------------------------------------------------- #
+    # ----- 構築 -------------------------------------------------------------- #
     def __init__(
         self,
         grid: Optional[List[List[int]]] = None,
@@ -44,31 +44,31 @@ class RestaurantLayout:
         self.kitchen: List[Tuple[int, int]] = kitchen_positions or []
         self.parking: Optional[Tuple[int, int]] = parking_position
         
-        # 每个桌子的送餐点，格式: {桌子ID: (行, 列)}
+        # 各テーブルの配膳ポイント、フォーマット: {テーブルID: (行, 列)}
         self.delivery_points: Dict[str, Tuple[int, int]] = delivery_points or {}
         
-        # 如果没有预设送餐点，自动为每个桌子生成
+        # 配膳ポイントが事前設定されていない場合、自動的に各テーブルに生成
         if not self.delivery_points:
             self._generate_delivery_points()
 
     def _generate_delivery_points(self) -> None:
         """
-        为每个桌子自动生成送餐点
-        优先选择北、东、南、西四个方向上最近的空闲点
+        各テーブルの配膳ポイントを自動生成
+        北、東、南、西の四方向で最も近い空きポイントを優先
         """
         directions = [(-1, 0), (0, 1), (1, 0), (0, -1)]  # 上、右、下、左
         
         for table_id, table_pos in self.tables.items():
             row, col = table_pos
             
-            # 尝试四个方向
+            # 四方向を試す
             for dr, dc in directions:
                 delivery_pos = (row + dr, col + dc)
                 if self.is_free(delivery_pos):
                     self.delivery_points[table_id] = delivery_pos
                     break
             
-            # 如果四个直接相邻的点都不可用，尝试更远的点
+            # 四つの隣接ポイントが使用できない場合、より遠いポイントを試す
             if table_id not in self.delivery_points:
                 for distance in range(2, 4):
                     for dr, dc in directions:
@@ -81,7 +81,7 @@ class RestaurantLayout:
 
     def is_free(self, pos: Tuple[int, int]) -> bool:
         """
-        位置是否可通行（空地 / 厨房 / 停靠点）
+        位置が通行可能かどうか（空地 / キッチン / 駐車ポイント）
         """
         x, y = pos
         return (
@@ -90,7 +90,7 @@ class RestaurantLayout:
 
     def neighbors(self, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
         """
-        返回上下左右可通行的相邻位置
+        上下左右の通行可能な隣接位置を返す
         """
         x, y = pos
         cand = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
@@ -98,57 +98,57 @@ class RestaurantLayout:
         
     def get_delivery_point(self, table_id: str) -> Optional[Tuple[int, int]]:
         """
-        获取特定桌子的送餐点
+        特定テーブルの配膳ポイントを取得
         
         Args:
-            table_id: 桌子ID
+            table_id: テーブルID
             
         Returns:
-            Tuple[int, int]: 送餐点坐标
-            如果桌子不存在或没有送餐点，返回None
+            Tuple[int, int]: 配膳ポイントの座標
+            テーブルが存在しないか配膳ポイントがない場合はNoneを返す
         """
         return self.delivery_points.get(table_id)
     
     @staticmethod
     def parse_layout_from_array(layout_name: str, grid_array: List[List[int]]):
         """
-        从数字数组解析餐厅布局（新格式）
+        数値配列からレストランレイアウトを解析（新フォーマット）
         
-        数字编码:
+        数値コード:
         0: 空地
-        1: 墙壁/障碍物
-        2-99: 桌子编号(例如21表示21号桌)
-        100: 厨房
-        200: 停靠点
+        1: 壁/障害物
+        2-99: テーブル番号（例えば21は21番テーブル）
+        100: キッチン
+        200: 駐車ポイント
         
         Args:
-            layout_name: 布局名称
-            grid_array: 布局矩阵数组
+            layout_name: レイアウト名
+            grid_array: レイアウトマトリックス配列
 
         Returns:
-            dict: 包含解析后的布局配置
+            dict: 解析後のレイアウト設定を含む
         """
         height = len(grid_array)
         width = len(grid_array[0]) if height > 0 else 0
-        grid = [row[:] for row in grid_array]  # 深拷贝网格
+        grid = [row[:] for row in grid_array]  # ディープコピー
         
         table_positions = {}
         kitchen_positions = []
         parking_position = None
         
-        # 提取特殊位置
+        # 特殊位置を抽出
         for row in range(height):
             for col in range(width):
                 value = grid[row][col]
-                if value == 101:  # 墙壁/障碍物
+                if value == 101:  # 壁/障害物
                     grid[row][col] = 1
-                elif 1 <= value <= 99:  # 桌子
+                elif 1 <= value <= 99:  # テーブル
                     table_positions[str(value)] = (row, col)
                     grid[row][col] = 2
-                elif value == 100:  # 厨房
+                elif value == 100:  # キッチン
                     kitchen_positions.append((row, col))
                     grid[row][col] = 3
-                elif value == 200:  # 停靠点
+                elif value == 200:  # 駐車ポイント
                     parking_position = (row, col)
                     grid[row][col] = 4
         

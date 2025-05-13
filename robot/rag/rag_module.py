@@ -24,18 +24,36 @@ class RAGModule:
     def __init__(
         self,
         api_key: str | None = None,
-        knowledge_file: str | None = None,
+        knowledge_dir: str | None = None,
+        vector_db_dir: str | None = None,
         top_k: int = 3,
     ) -> None:
+        """
+        初期化
+
+        Args:
+            api_key: OpenAI API キー
+            knowledge_dir: 知識ディレクトリパス
+            vector_db_dir: ベクトルDB保存ディレクトリ
+            top_k: 検索で取得する結果数
+        """
         self.llm = LLMClient(api_key)
         self.top_k = top_k
-
-        if knowledge_file and os.path.exists(knowledge_file):
-            kb = KnowledgeBase(knowledge_file, self.llm)
+        
+        # 知識ディレクトリのデフォルト値を設定
+        if knowledge_dir is None:
+            # モジュールのディレクトリを取得
+            module_dir = os.path.dirname(os.path.abspath(__file__))
+            knowledge_dir = os.path.join(module_dir, "knowledge")
+        
+        # 知識ベースとレトリーバーを初期化
+        if os.path.exists(knowledge_dir):
+            kb = KnowledgeBase(knowledge_dir, self.llm, vector_db_dir=vector_db_dir)
             self.retriever = Retriever(kb)
+            logger.info(f"知識ベースを初期化しました: {knowledge_dir}")
         else:
             self.retriever = None
-            logger.warning("No knowledge base provided; RAG fallback to zero-shot.")
+            logger.warning(f"知識ディレクトリが見つかりません: {knowledge_dir}; RAGはゼロショットにフォールバックします。")
 
     # ---------------- 公共 ---------------- #
     def is_ready(self) -> bool:
@@ -43,6 +61,25 @@ class RAGModule:
         检查是否已加载知识库
         """
         return self.retriever is not None
+
+    def update_knowledge_base(self) -> bool:
+        """
+        知識ベースを更新する
+        
+        Returns:
+            bool: 成功したかどうか
+        """
+        if not self.retriever:
+            logger.error("知識ベースが初期化されていません")
+            return False
+        
+        try:
+            self.retriever.kb.update_knowledge_base()
+            logger.info("知識ベースを更新しました")
+            return True
+        except Exception as e:
+            logger.error(f"知識ベース更新エラー: {e}")
+            return False
 
     def obstacle_decision(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """

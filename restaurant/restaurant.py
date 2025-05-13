@@ -1,8 +1,9 @@
 """
-Restaurant – 餐厅业务对象
+Restaurant – レストランビジネスオブジェクト
 
-该类只是一个“外观”层，持有 `RestaurantLayout` 实例并向外暴露简易接口
-方便上层代码（Robot / Simulator / UI）调用，而不直接操作布局细节
+このクラスは単なる「ファサード」層で、`RestaurantLayout`インスタンスを保持し、
+シンプルなインターフェースを外部に公開します。上位コード（Robot / Simulator / UI）が
+レイアウトの詳細を直接操作せずに呼び出すことができます。
 """
 
 from restaurant.restaurant_layout import RestaurantLayout
@@ -10,7 +11,7 @@ from restaurant.restaurant_layout import RestaurantLayout
 
 class Restaurant:
     """
-    餐厅对象，包含名称与布局。
+    レストランオブジェクト。名前とレイアウトを含みます。
     """
 
     def __init__(self, name: str, layout: RestaurantLayout) -> None:
@@ -18,15 +19,15 @@ class Restaurant:
         Parameters
         ----------
         name : str
-            餐厅名称
+            レストラン名
         layout : RestaurantLayout
-            餐厅平面图对象，由外部先行创建后注入
+            レストラン図面オブジェクト。外部で先に作成して注入
         """
         self.name: str = name
         self.layout: RestaurantLayout = layout
 
     # --------------------------------------------------------------------- #
-    # 魔术方法
+    # マジックメソッド
     # --------------------------------------------------------------------- #
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Restaurant {self.name!r} ({self.layout.width}×{self.layout.height})>"

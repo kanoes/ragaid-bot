@@ -1,49 +1,56 @@
-# robot — 机器人核心逻辑
+# robot — ロボットのコアロジック
 
-`robot` 包负责餐厅配送机器人的核心功能，遵循三层架构：
+`robot` パッケージは、レストラン配達ロボットの中核機能を担当します。
+全体は三層アーキテクチャに従って設計されています：
 
 ```text
-┌────────────┐     ┌───────────────┐     ┌──────────────────┐
-│ 调度层      │ --> │ 规划层         │ --> │ 执行层            │
-│ Robot      │     │ PathPlanner   │     │ MotionController │
-│ AIEnhanced │     │ OrderManager  │     │ + RAGModule      │
-└────────────┘     └───────────────┘     └──────────────────┘
+┌─────────────────┐     ┌───────────────┐     ┌──────────────────┐
+│ スケジューリング層 │ --> │ 計画層         │ --> │ 実行層            │
+│ Robot      　　　│     │ PathPlanner   │     │ MotionController │
+│ AIEnhanced 　　　│     │ OrderManager  │     │ + RAGModule      │
+└─────────────────┘     └───────────────┘     └──────────────────┘
 ```
 
-- **调度层**：`Robot` / `AIEnhancedRobot` 负责订单分配、路径规划与执行
-- **规划层**：`PathPlanner` (A*) 与 `OrderManager` / `Order` 实现订单生命周期管理
-- **执行层**：`MotionController` 执行单步移动并处理障碍，可选 `RAGModule` 进行智能决策
+- **スケジューリング層**：`Robot` / `AIEnhancedRobot` が注文の割り当て、経路計画、実行を管理します
+- **計画層**：`PathPlanner` (A*) および `OrderManager` / `Order` により注文のライフサイクルを制御
+- **実行層**：`MotionController` がステップ移動や障害物対応を担当し、オプションで `RAGModule` によるインテリジェントな意思決定も可能です
 
-## 目录结构
+---
+
+## ディレクトリ構成
 
 ```text
 robot/
-├─ robot.py                # `Robot` & `AIEnhancedRobot`
-├─ motion_controller.py    # 行为执行层
-├─ plan.py                 # `PathPlanner` 实现
+├─ robot.py                # `Robot` および `AIEnhancedRobot`
+├─ motion_controller.py    # 実行層
+├─ plan.py                 # `PathPlanner` 実装
 ├─ order.py                # `Order`, `OrderStatus`, `OrderManager`
-├─ rag/                    # RAG 子包 (检索 + 决策)
-│  ├─ knowledge/           # 默认知识库
+├─ rag/                    # RAGサブパッケージ (検索 + 推論)
+│  ├─ knowledge/           # デフォルトナレッジベース
 │  │  └─ restaurant_rule.json
-│  ├─ llm_client.py        # LLM 接口封装
-│  ├─ knowledge_base.py    # 知识库加载与索引
-│  ├─ retriever.py         # 向量检索组件
-│  ├─ prompt_helper.py     # Prompt 构建与解析
-│  ├─ rag_module.py        # `RAGModule` 核心类
-│  └─ README.md            # 本说明文档
+│  ├─ llm_client.py        # LLMクライアントラッパー
+│  ├─ knowledge_base.py    # ナレッジベースのロードとインデックス化
+│  ├─ retriever.py         # ベクトル検索コンポーネント
+│  ├─ prompt_helper.py     # プロンプト作成と解析
+│  ├─ rag_module.py        # `RAGModule` コアクラス
+│  └─ README.md            # 本ドキュメント
 └─ __init__.py
 ```
 
-## 主要组件
+---
 
-- **Robot** / **AIEnhancedRobot**：调度层接口，管理订单、路径与执行
-- **PathPlanner**：A* 算法实现，支持扩圈搜索策略
-- **Order** & **OrderManager**：订单实体和队列管理
-- **MotionController**：执行层，负责单步移动及障碍应对
-- **RAGModule**：基于知识库 + LLM 的智能决策
+## 主なコンポーネント
 
-## 改进建议
+- **Robot** / **AIEnhancedRobot**：スケジューリング層インターフェース。注文、経路、実行の管理を担当
+- **PathPlanner**：A* アルゴリズム実装、拡張型サーチ戦略にも対応
+- **Order** & **OrderManager**：注文エンティティとキュー管理
+- **MotionController**：単ステップ移動と障害物回避ロジック
+- **RAGModule**：ナレッジベース＋LLMを組み合わせたスマート推論モジュール
 
-- 在 `plan.py` 中支持多种路径规划算法插件化（如 Dijkstra、遗传算法等）
-- 在 `motion_controller.py` 中加入模拟电池消耗和避障策略
-- 基于restaurant侧增加的多种突发情况，增加测试例与测试数据
+---
+
+## 改善提案
+
+- `plan.py` にて、Dijkstra法や遺伝的アルゴリズムなど複数の経路計画アルゴリズムをプラグイン形式でサポート
+- `motion_controller.py` にバッテリー消費や高度な障害物回避戦略のシミュレーションを追加
+- `restaurant` サイドの多様な突発イベント対応にあわせ、テストケース・テストデータを拡充することを推奨
