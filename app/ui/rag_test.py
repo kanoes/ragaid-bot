@@ -6,29 +6,34 @@ import os
 import streamlit as st
 import dotenv
 
+from robot.rag import RAGModule
+
 dotenv.load_dotenv()
 
 def render_rag_test():
     """
     RAGテストインターフェイスをレンダリングし、ユーザーがRAGモジュールのQA機能を直接テストできるようにします
     """
-    from robot.rag import RAGModule
 
     st.header("RAGシステムテスト")
 
     # OpenAI APIキーを使用
     api_key = os.environ.get("OPENAI_API_KEY", None)
 
-    # RAGモジュールを初期化
+    # 現在のディレクトリの取得
     current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    knowledge_file = os.path.join(current_dir, "robot", "rag", "knowledge", "restaurant_rule.json")
-    print(knowledge_file)
+    # 知識ディレクトリの指定
+    knowledge_dir = os.path.join(current_dir, "robot", "rag", "knowledge")
+    # ベクトルDBディレクトリの指定
+    vector_db_dir = os.path.join(knowledge_dir, "vector_db")
 
     # セッション状態にRAGモジュールが存在しない場合は初期化
     if "rag_module" not in st.session_state:
         rag = RAGModule(
             api_key=api_key,
-            knowledge_file=knowledge_file,
+            knowledge_dir=knowledge_dir,
+            vector_db_dir=vector_db_dir,
+            top_k=3
         )
         st.session_state["rag_module"] = rag
     else:
@@ -38,7 +43,7 @@ def render_rag_test():
     if not rag.is_ready():
         st.warning("ナレッジベースがロードされていない、またはAPIキーが設定されていません。純粋なLLM回答が使用される可能性があります。")
     else:
-        st.success(f"ナレッジベースを正常にロードしました: {knowledge_file}")
+        st.success(f"ナレッジベースを正常にロードしました: {knowledge_dir}")
 
     # テストインターフェイスを作成
     test_tabs = st.tabs(["QAテスト", "思考レイヤーテスト", "トリガーレイヤーテスト", "意思決定インターフェーステスト"])
