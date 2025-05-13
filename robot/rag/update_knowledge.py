@@ -11,8 +11,8 @@ import os
 import sys
 from typing import Optional
 
-from .llm_client import LLMClient
-from .knowledge_base import KnowledgeBase
+from robot.rag.llm_client import LLMClient
+from robot.rag.knowledge_base import KnowledgeBase
 
 # ロギング設定
 logging.basicConfig(
@@ -83,7 +83,7 @@ def update_knowledge_base(
         # モジュールのパスを設定
         if knowledge_dir is None:
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            knowledge_dir = os.path.join(current_dir, "knowledge")
+            knowledge_dir = os.path.join(current_dir, "knowledge/json")
         
         logger.info(f"知識ディレクトリ: {knowledge_dir}")
         
@@ -112,7 +112,7 @@ def main() -> int:
     # 知識ベース更新実行
     success = update_knowledge_base(
         knowledge_dir=args.knowledge_dir,
-        vector_db_dir=args.vector_db_dir,
+        vector_db_dir="robot/rag/knowledge/vector_db",
         api_key=args.api_key,
         verbose=args.verbose,
     )
