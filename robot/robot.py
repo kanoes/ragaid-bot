@@ -7,26 +7,214 @@
 * Order / OrderManager    — 注文層（robot.order）
 * MotionController        — アクション層（robot.motion_controller）
 * Robot / AIEnhancedRobot — スケジューリング層（本ファイル）
+* RobotStatistics         - 統計層（本ファイル）
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from typing import List, Optional, Tuple, Deque
+from typing import List, Optional, Tuple, Deque, Dict, Any, Protocol, runtime_checkable
 from collections import deque
 import time
 
 from restaurant.restaurant_layout import RestaurantLayout
 from robot.motion_controller import MotionController
-from robot.plan import PathPlanner
+from robot.plan import PathPlanner, IPathPlanner
 from robot.order import Order
 from robot.rag import RAGModule
 
 logger = logging.getLogger(__name__)
 
 
-class Robot:
+@runtime_checkable
+class IRobot(Protocol):
+    """
+    ロボットインターフェース
+    すべてのロボットが実装する必要があるメソッドを定義
+    """
+    
+    def assign_order(self, order: Order) -> bool:
+        """注文を受け付けてキューに追加"""
+        ...
+    
+    def tick(self) -> None:
+        """シミュレーションの1ステップを実行"""
+        ...
+    
+    def simulate(self, max_step: int) -> None:
+        """指定ステップまでシミュレーション実行"""
+        ...
+    
+    def stats(self) -> dict:
+        """統計情報を取得"""
+        ...
+
+
+class RobotStatistics:
+    """
+    ロボット統計データを収集・管理するクラス
+    """
+    
+    def __init__(self, robot_type: str, restaurant_name: str) -> None:
+        """
+        統計クラスの初期化
+        
+        Args:
+            robot_type: ロボットタイプ（"基本ロボット"または"インテリジェントRAGロボット"）
+            restaurant_name: レストラン名
+        """
+        self.robot_type = robot_type
+        self.restaurant_name = restaurant_name
+        
+        # 基本統計データ
+        self._stats = {
+            "total_steps": 0,            # 総ステップ数（経路長）
+            "total_time": 0,             # 総配達時間
+            "total_orders": 0,           # 総注文数
+            "avg_waiting_time": 0,       # 平均注文待ち時間
+        }
+        
+        # 配達履歴
+        self._delivery_history = []
+        
+        # パス履歴
+        self.path_history: list[tuple[int, int]] = []
+    
+    def add_position(self, position: Tuple[int, int]) -> None:
+        """パス履歴に位置を追加"""
+        self.path_history.append(position)
+    
+    def record_step(self) -> None:
+        """ステップ数を増加"""
+        self._stats["total_steps"] += 1
+    
+    def record_order_completion(self) -> int:
+        """注文完了を記録し、配達順序番号を返す"""
+        self._stats["total_orders"] += 1
+        return self._stats["total_orders"]
+    
+    def calculate_delivery_cycle(
+        self, 
+        batch_id: int,
+        start_time: float,
+        batch_start_time: float,
+        speed: float,
+        batch_orders: List[Order]
+    ) -> None:
+        """
+        配達サイクルの統計情報を計算
+        
+        Args:
+            batch_id: バッチID
+            start_time: 配達開始時間
+            batch_start_time: バッチ開始時間
+            speed: ロボット速度
+            batch_orders: バッチ内の注文リスト
+        """
+        end_time = time.time()
+        
+        # 本バッチの時間を計算
+        batch_time = 0
+        if batch_start_time is not None:
+            batch_time = end_time - batch_start_time
+        else:
+            # バッチ開始時間がない場合、配送開始時間を使用
+            batch_time = end_time - start_time
+        
+        # 総配達路程を計算
+        path_length = len(self.path_history) - 1  # 初期位置を除く
+        
+        # 経路長と速度を使用して時間を計算
+        calculated_time = path_length / speed
+        
+        # 統計データを更新
+        self._stats["total_steps"] += path_length
+        self._stats["total_time"] = calculated_time  # 計算時間を使用
+        
+        # 本バッチの平均注文待ち時間を計算
+        avg_batch_waiting_time = 0
+        if batch_orders:
+            total_waiting_time = 0
+            for i, order in enumerate(batch_orders):
+                # 注文待ち時間 = 注文到着時間 = 開始から現在注文の配送時間
+                # 配送順序に従って計算、前の注文待ち時間が短く、後の待ち時間が長い
+                order_delivery_time = calculated_time * (i+1) / len(batch_orders)
+                total_waiting_time += order_delivery_time
+            
+            # 平均注文待ち時間 = 総待ち時間 / 注文数
+            avg_batch_waiting_time = total_waiting_time / len(batch_orders)
+            
+            # 総体平均注文待ち時間を更新（累積移動平均を使用）
+            if self._stats["total_orders"] > 0:
+                prev_weight = self._stats["total_orders"] - len(batch_orders)
+                new_weight = len(batch_orders)
+                self._stats["avg_waiting_time"] = (
+                    (self._stats["avg_waiting_time"] * prev_weight + avg_batch_waiting_time * new_weight) /
+                    self._stats["total_orders"]
+                )
+            else:
+                self._stats["avg_waiting_time"] = avg_batch_waiting_time
+        
+        # 注文情報を準備、配送順序を含む
+        order_info = []
+        for order in batch_orders:
+            order_data = {
+                "order_id": order.order_id,
+                "table_id": order.table_id
+            }
+            # 配送順序情報を追加（ある場合）
+            if hasattr(order, "delivery_sequence") and order.delivery_sequence is not None:
+                order_data["delivery_sequence"] = order.delivery_sequence
+            order_info.append(order_data)
+        
+        # 本配送バッチの履歴を記録
+        batch_record = {
+            "batch_id": batch_id,
+            "total_time": calculated_time,  # 計算時間を使用
+            "path_length": path_length,
+            "avg_waiting_time": avg_batch_waiting_time,
+            "ロボットタイプ": self.robot_type,
+            "orders": order_info,
+            "レストランレイアウト": self.restaurant_name
+        }
+        self._delivery_history.append(batch_record)
+        
+        logger.info(f"配送サイクル完了、総配送時間: {batch_time:.2f}秒、" 
+                   f"配送注文: {len(batch_orders)}個、"
+                   f"経路長: {path_length}")
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        統計情報を取得
+        
+        Returns:
+            Dict[str, Any]: 統計情報を含む辞書
+        """
+        stats = dict(self._stats)
+        
+        # 経路情報を追加
+        stats["総配送路程"] = len(self.path_history) - 1  # 初期位置を除く
+        
+        # ロボットタイプ情報を追加
+        stats["ロボットタイプ"] = self.robot_type
+        
+        # 配送履歴を追加
+        stats["配送履歴"] = self._delivery_history
+        
+        # 将来の拡張用に他のデータフィールドを予約
+        stats["他のデータ"] = {
+            "エネルギー消費": 0,       # 予約：ロボットエネルギー消費
+            "障害物処理回数": 0,   # 予約：障害物に遭遇する回数
+            "待機操作回数": 0,     # 予約：待機操作の回数
+            "経路再計画回数": 0,   # 予約：経路を再計画する回数
+            "混雑区域": [],       # 予約：レストラン混雑区域
+        }
+        
+        return stats
+
+
+class Robot(IRobot):
     """
     基本ロボット：RAG知能なし
     """
@@ -40,6 +228,7 @@ class Robot:
         robot_id: int = 1,
         restaurant_name: str = "デフォルトレストラン",
         start: Optional[Tuple[int, int]] = None,
+        planner: Optional[IPathPlanner] = None,
     ) -> None:
         self.layout = layout
         self.robot_id = robot_id
@@ -52,28 +241,23 @@ class Robot:
         self.goal: Optional[Tuple[int, int]] = None
         self.path: List[Tuple[int, int]] = []
 
-        self.planner = PathPlanner(layout)
+        # 経路計画器の初期化（依存性の注入）
+        self.planner = planner or PathPlanner(layout)
         self.controller = MotionController(layout, self.planner)
 
         # 注文キュー
         self.order_queue: Deque[Order] = deque()
         self.current_order: Optional[Order] = None
         
-        # 新しい統計データ構造
-        self._stats = {
-            "total_steps": 0,            # 総ステップ数（経路長）
-            "total_time": 0,             # 総配達時間
-            "total_orders": 0,           # 総注文数
-            "avg_waiting_time": 0,       # 平均注文待ち時間
-        }
-        # 配達履歴
-        self._delivery_history = []
+        # 統計管理クラスを初期化
+        self.is_ai_enhanced = isinstance(self, AIEnhancedRobot)
+        robot_type = "インテリジェントRAGロボット" if self.is_ai_enhanced else "基本ロボット"
+        self._stats = RobotStatistics(robot_type, restaurant_name)
+        self._stats.add_position(self.position)  # 初期位置を記録
         
-        self.path_history: list[tuple[int, int]] = [self.position]
         self.returning_to_parking = False
         self.delivery_start_time = None
         self.all_assigned_orders = []
-        self.is_ai_enhanced = isinstance(self, AIEnhancedRobot)  # インテリジェントロボットかどうかを確認
         
         # バッチ処理制御パラメータ
         self.batch_collection_time = 1.0  # 注文を一括収集する時間ウィンドウ（秒）
@@ -290,7 +474,7 @@ class Robot:
     # ---------------- シミュレーションループ ---------------- #
     def tick(self) -> None:
         # ステップ数を記録
-        self._stats["total_steps"] += 1
+        self._stats.record_step()
         
         # バッチ処理タイマーをチェック
         if self.batch_processing and self.last_order_time:
@@ -325,7 +509,7 @@ class Robot:
 
         # 実際に移動したときに軌跡を記録
         if self.position != prev:
-            self.path_history.append(self.position)
+            self._stats.add_position(self.position)
             
         # 目標点に到着したかどうかをチェック（許容範囲を考慮）
         if self.goal and self._is_at_goal():
@@ -337,9 +521,8 @@ class Robot:
             return
         if success:
             # 配送完了番号を追加
-            self.current_order.delivery_sequence = self._stats["total_orders"] + 1
+            self.current_order.delivery_sequence = self._stats.record_order_completion()
             self.current_order.complete_delivery()
-            self._stats["total_orders"] += 1
             logger.info("注文 #%s (テーブル: %s) 配送成功、配送順序: #%d", 
                        self.current_order.order_id, 
                        self.current_order.table_id,
@@ -356,78 +539,14 @@ class Robot:
         駐車スポットから戻るまでの総配達時間と統計データを計算
         """
         if self.delivery_start_time is not None:
-            end_time = time.time()
-            
-            # 本バッチの時間を計算
-            batch_time = 0
-            if self.current_batch_start_time is not None:
-                batch_time = end_time - self.current_batch_start_time
-            else:
-                # バッチ開始時間がない場合、配送開始時間を使用
-                batch_time = end_time - self.delivery_start_time
-                self.current_batch_start_time = self.delivery_start_time  # バッチ開始時間があることを確保
-            
-            # 総配達路程を計算
-            path_length = len(self.path_history) - 1  # 初期位置を除く
-            
-            # 経路長と速度を使用して時間を計算
-            calculated_time = path_length / self.speed
-            
-            # 統計データを更新
-            self._stats["total_steps"] += path_length
-            self._stats["total_time"] = calculated_time  # 計算時間を使用
-            
-            # 本バッチの平均注文待ち時間を計算
-            avg_batch_waiting_time = 0
-            if self.current_batch_orders:
-                total_waiting_time = 0
-                for i, order in enumerate(self.current_batch_orders):
-                    # 注文待ち時間 = 注文到着時間 = 開始から現在注文の配送時間
-                    # 配送順序に従って計算、前の注文待ち時間が短く、後の待ち時間が長い
-                    order_delivery_time = calculated_time * (i+1) / len(self.current_batch_orders)
-                    total_waiting_time += order_delivery_time
-                
-                # 平均注文待ち時間 = 総待ち時間 / 注文数
-                avg_batch_waiting_time = total_waiting_time / len(self.current_batch_orders)
-                
-                # 総体平均注文待ち時間を更新（累積移動平均を使用）
-                if self._stats["total_orders"] > 0:
-                    prev_weight = self._stats["total_orders"] - len(self.current_batch_orders)
-                    new_weight = len(self.current_batch_orders)
-                    self._stats["avg_waiting_time"] = (
-                        (self._stats["avg_waiting_time"] * prev_weight + avg_batch_waiting_time * new_weight) /
-                        self._stats["total_orders"]
-                    )
-                else:
-                    self._stats["avg_waiting_time"] = avg_batch_waiting_time
-
-            # 注文情報を準備、配送順序を含む
-            order_info = []
-            for order in self.current_batch_orders:
-                order_data = {
-                    "order_id": order.order_id,
-                    "table_id": order.table_id
-                }
-                # 配送順序情報を追加（ある場合）
-                if hasattr(order, "delivery_sequence") and order.delivery_sequence is not None:
-                    order_data["delivery_sequence"] = order.delivery_sequence
-                order_info.append(order_data)
-            
-            # 本配送バッチの履歴を記録
-            batch_record = {
-                "batch_id": self.current_batch_id,
-                "total_time": calculated_time,  # 計算時間を使用
-                "path_length": path_length,
-                "avg_waiting_time": avg_batch_waiting_time,
-                "ロボットタイプ": "インテリジェントRAGロボット" if self.is_ai_enhanced else "基本ロボット",
-                "orders": order_info,
-                "レストランレイアウト": self.restaurant_name
-            }
-            self._delivery_history.append(batch_record)
-            
-            logger.info(f"Robot #{self.robot_id} 配送サイクル完了、総配送時間: {batch_time:.2f}秒、" 
-                       f"配送注文: {len(self.current_batch_orders)}個、"
-                       f"経路長: {path_length}")
+            # 統計クラスに処理を委譲
+            self._stats.calculate_delivery_cycle(
+                batch_id=self.current_batch_id,
+                start_time=self.delivery_start_time,
+                batch_start_time=self.current_batch_start_time,
+                speed=self.speed,
+                batch_orders=self.current_batch_orders
+            )
             
             # 現在のバッチデータをリセット
             self.delivery_start_time = None
@@ -469,27 +588,7 @@ class Robot:
         """
         豊富な統計指標を提供
         """
-        stats = dict(self._stats)
-            
-        # 経路情報を追加
-        stats["総配送路程"] = len(self.path_history) - 1  # 初期位置を除く
-        
-        # ロボットタイプ情報を追加
-        stats["ロボットタイプ"] = "インテリジェントRAGロボット" if self.is_ai_enhanced else "基本ロボット"
-        
-        # 配送履歴を追加
-        stats["配送履歴"] = self._delivery_history
-        
-        # 将来の拡張用に他のデータフィールドを予約
-        stats["他のデータ"] = {
-            "エネルギー消費": 0,       # 予約：ロボットエネルギー消費
-            "障害物処理回数": 0,   # 予約：障害物に遭遇する回数
-            "待機操作回数": 0,     # 予約：待機操作の回数
-            "経路再計画回数": 0,   # 予約：経路を再計画する回数
-            "混雑区域": [],       # 予約：レストラン混雑区域
-        }
-            
-        return stats
+        return self._stats.get_stats()
 
 
 class AIEnhancedRobot(Robot):
@@ -504,10 +603,16 @@ class AIEnhancedRobot(Robot):
         api_key: str | None = None,
         knowledge_dir: str | None = None,
         start: Optional[Tuple[int, int]] = None,
+        planner: Optional[IPathPlanner] = None,
     ) -> None:
-        super().__init__(layout, robot_id, start)
+        # 基底クラスの初期化
+        super().__init__(layout, robot_id, start=start, planner=planner)
+        
+        # RAGモジュールの初期化
         self.rag = RAGModule(
             api_key=api_key,
             knowledge_file=os.path.join(knowledge_dir, "restaurant_rule.json") if knowledge_dir else None,
         )
+        
+        # RAG対応のコントローラーに置き換え
         self.controller = MotionController(layout, self.planner, rag=self.rag)

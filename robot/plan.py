@@ -1,6 +1,7 @@
 """
 路径规划组件
 
+IPathPlanner接口：定义路径规划器的抽象接口
 PathPlanner类：基于A*算法，负责在 `RestaurantLayout` 上寻找最短路径
 """
 
@@ -8,7 +9,7 @@ from __future__ import annotations
 
 import heapq
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Protocol, runtime_checkable
 
 from restaurant.restaurant_layout import RestaurantLayout
 
@@ -16,9 +17,38 @@ logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- #
+# 路径规划接口
+# --------------------------------------------------------------------------- #
+@runtime_checkable
+class IPathPlanner(Protocol):
+    """
+    路径规划器接口，定义所有路径规划器必须实现的方法
+    """
+    
+    def find_path(
+        self,
+        start: Tuple[int, int],
+        goal: Tuple[int, int],
+        allow_expand: bool = True,
+    ) -> Optional[List[Tuple[int, int]]]:
+        """
+        搜索从 *start* 到 *goal* 的路径
+        
+        Args:
+            start: 起点坐标
+            goal: 终点坐标
+            allow_expand: 是否允许在目标周围扩大搜索范围
+            
+        Returns:
+            找到的路径（坐标列表）或None（无路径）
+        """
+        ...
+
+
+# --------------------------------------------------------------------------- #
 # 路径规划 – A* 实现
 # --------------------------------------------------------------------------- #
-class PathPlanner:
+class PathPlanner(IPathPlanner):
     """
     基于 A* 的网格路径规划器
     """
