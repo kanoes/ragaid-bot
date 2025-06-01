@@ -41,6 +41,22 @@
 cat extensions.txt | xargs -n 1 code --install-extension
 ```
 
+- MacTeXをインストール（選択）
+
+Macのターミナルで以下入力
+
+```bash
+brew install --cask mactex
+```
+
+```bash
+brew install chktex
+```
+
+```bash
+brew install latexindent
+```
+
 ### venv
 
 #### Windows環境
