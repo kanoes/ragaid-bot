@@ -589,6 +589,13 @@ class Robot(IRobot):
         豊富な統計指標を提供
         """
         return self._stats.get_stats()
+    
+    @property
+    def path_history(self) -> list[tuple[int, int]]:
+        """
+        パス履歴を取得
+        """
+        return self._stats.path_history
 
 
 class AIEnhancedRobot(Robot):
