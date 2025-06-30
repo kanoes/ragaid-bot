@@ -360,43 +360,9 @@ def render_plotly_robot_path(_restaurant, path_history, orders=None, title="ロ�
                         width=2,
                         color="#ff4d4d",
                     ),
-                    name="配達経路",
+                    showlegend=False,  # 図例を非表示にする
                 )
             )
-
-            # スタートとゴールのマーカーを追加
-            if len(path_points) > 1:
-                # スタート（緑色の三角）
-                fig.add_trace(
-                    go.Scatter(
-                        x=[path_x[0]],
-                        y=[path_y[0]],
-                        mode="markers",
-                        marker=dict(
-                            size=12,
-                            color="#00cc66",
-                            symbol="triangle-up",
-                            line=dict(width=1, color="black"),
-                        ),
-                        name="スタート",
-                    )
-                )
-
-                # ゴール（赤色の星）
-                fig.add_trace(
-                    go.Scatter(
-                        x=[path_x[-1]],
-                        y=[path_y[-1]],
-                        mode="markers",
-                        marker=dict(
-                            size=12,
-                            color="#ff4d4d",
-                            symbol="star",
-                            line=dict(width=1, color="black"),
-                        ),
-                        name="ゴール",
-                    )
-                )
         
         # オーダー情報が提供されている場合、配送順に基づいてコメントを追加
         if orders:
